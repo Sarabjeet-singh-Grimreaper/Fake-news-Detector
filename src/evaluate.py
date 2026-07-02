@@ -8,7 +8,7 @@ def evaluate_model(y_true, y_pred, model_name):
     Generates and prints a detailed classification report, 
     and visually plots and saves a confusion matrix heatmap.
     """
-    print(f"\n📊 --- Detailed Evaluation Metrics for {model_name} ---")
+    print(f"\n[Eval] --- Detailed Evaluation Metrics for {model_name} ---")
     # Prints Precision, Recall, and F1-score for both 0 (Fake) and 1 (Real)
     print(classification_report(y_true, y_pred))
     
@@ -39,4 +39,4 @@ def evaluate_model(y_true, y_pred, model_name):
     plt.savefig(plot_path)
     plt.close() # Close plot to free up machine memory
     
-    print(f"📉 Confusion matrix plot saved successfully to: {plot_path}")
+    print(f"[Eval] Confusion matrix plot saved successfully to: {plot_path}")
