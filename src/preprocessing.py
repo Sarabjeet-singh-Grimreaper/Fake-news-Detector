@@ -18,10 +18,16 @@ STOPWORDS = {
     'very', 's', 't', 'can', 'will', 'just', 'should', "should've", 'now'
 }
 
+# Pre-compile regular expressions at the module level for maximum execution performance
+URL_PATTERN = re.compile(r'https?://\S+|www\.\S+')
+PUNCT_PATTERN = re.compile(r'\W')
+NUMBER_PATTERN = re.compile(r'\b\d+\b')
+SPACES_PATTERN = re.compile(r'\s+')
+
 def clean_text(text):
     """
     Cleans raw text by removing punctuation, links, and numbers,
-    and converting everything to lowercase.
+    and converting everything to lowercase. Optimized using pre-compiled regex.
     """
     if not isinstance(text, str):
         return ""
@@ -30,16 +36,16 @@ def clean_text(text):
     text = text.lower()
     
     # Strip web links (URLs)
-    text = re.sub(r'https?://\S+|www\.\S+', ' ', text)
+    text = URL_PATTERN.sub(' ', text)
     
     # Replace punctuation symbols with a space so words don't mash together
-    text = re.sub(r'\W', ' ', text)
+    text = PUNCT_PATTERN.sub(' ', text)
     
     # Remove solo numbers/digits
-    text = re.sub(r'\b\d+\b', ' ', text)
+    text = NUMBER_PATTERN.sub(' ', text)
     
     # Fix extra accidental spaces
-    text = re.sub(r'\s+', ' ', text).strip()
+    text = SPACES_PATTERN.sub(' ', text).strip()
     
     return text
 

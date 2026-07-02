@@ -1,5 +1,7 @@
 import streamlit as st
 import pickle
+import pandas as pd
+import numpy as np
 from src.preprocessing import full_preprocess_pipeline
 
 # Configure Page Layout and Style
@@ -68,37 +70,62 @@ st.markdown("""
         margin-bottom: 1.5rem;
     }
     
-    /* Badge styling */
-    .verdict-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.75rem 1.5rem;
+    /* Model Verdict Card Grid */
+    .model-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 2rem;
+    }
+    
+    .model-verdict-card {
+        background-color: #1e293b;
+        padding: 1.5rem;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        text-align: center;
+        transition: transform 0.2s, border-color 0.2s;
+    }
+    
+    .model-verdict-card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(99, 102, 241, 0.4);
+    }
+    
+    .verdict-badge-small {
+        display: inline-block;
+        padding: 0.35rem 0.75rem;
         border-radius: 100px;
+        font-size: 0.85rem;
         font-weight: 700;
-        font-size: 1.25rem;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-        margin-bottom: 1.5rem;
+        margin-top: 0.5rem;
     }
     
-    .badge-real {
-        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-        color: #ffffff;
-        border: 1px solid rgba(16, 185, 129, 0.2);
+    .badge-real-small {
+        background-color: rgba(16, 185, 129, 0.15);
+        color: #34d399;
+        border: 1px solid rgba(16, 185, 129, 0.3);
     }
     
-    .badge-fake {
-        background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
-        color: #ffffff;
-        border: 1px solid rgba(239, 68, 68, 0.2);
+    .badge-fake-small {
+        background-color: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.3);
     }
     
-    /* Glassmorphism sidebar */
-    .css-163ttbj, [data-testid="stSidebar"] {
-        background-color: #090d16 !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+    /* Tags styling for keywords */
+    .keyword-tag {
+        display: inline-block;
+        background-color: rgba(129, 140, 248, 0.15);
+        color: #a5b4fc;
+        padding: 0.35rem 0.85rem;
+        border-radius: 100px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+        border: 1px solid rgba(129, 140, 248, 0.2);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -127,30 +154,24 @@ st.sidebar.markdown("""
 <div style='text-align: center; margin-bottom: 2rem;'>
     <img src='https://img.icons8.com/nolan/96/security-shield.png' width='70'/>
     <h3 style='margin-top: 10px; font-weight: 700; color: #f1f5f9;'>Veritas AI Engine</h3>
-    <p style='color: #64748b; font-size: 0.85rem;'>Academic NLP Framework v1.0.0</p>
+    <p style='color: #64748b; font-size: 0.85rem;'>Academic NLP Framework v1.1.0</p>
 </div>
 """, unsafe_allow_html=True)
 
-st.sidebar.subheader("Classifier Suite")
-model_option = st.sidebar.selectbox(
-    "Select Model Architecture:",
-    ["Logistic Regression", "Random Forest", "Neural Network (MLP)", "K-Nearest Neighbors (KNN)"]
-)
+st.sidebar.markdown("""
+<div style='background-color: #111827; padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 1.5rem;'>
+    <h4 style='font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: #818cf8;'>Multi-Model Verdicts</h4>
+    <p style='font-size: 0.8rem; color: #94a3b8; line-height: 1.4; margin: 0;'>
+        This updated build processes input text through <strong>all 4 trained classifiers concurrently</strong> to visualize consensus and divergence.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
-model_key_map = {
-    "Logistic Regression": "logreg",
-    "Random Forest": "random_forest",
-    "Neural Network (MLP)": "neuralnet",
-    "K-Nearest Neighbors (KNN)": "knn"
-}
-selected_model_key = model_key_map[model_option]
-
-st.sidebar.markdown("<br><hr style='border-color: rgba(255,255,255,0.05);'><br>", unsafe_allow_html=True)
 st.sidebar.markdown("""
 <div style='background-color: #111827; padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);'>
-    <h4 style='font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: #818cf8;'>Strict Rule Constraints</h4>
+    <h4 style='font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: #f472b6;'>Scratch Restrictions</h4>
     <p style='font-size: 0.8rem; color: #94a3b8; line-height: 1.4; margin: 0;'>
-        This system is built without high-level NLP tokenizers (NLTK/SpaCy wrappers). Everything uses custom regex and standard scikit-learn.
+        No NLTK or SpaCy wrappers are active. Preprocessing relies purely on compiled module-level regexes for <strong>max performance</strong>.
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -166,7 +187,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-col_input, col_results = st.columns([1.8, 1.2], gap="large")
+col_input, col_results = st.columns([1.6, 1.4], gap="large")
 
 with col_input:
     st.markdown("""
@@ -183,13 +204,13 @@ with col_input:
         label_visibility="collapsed"
     )
     
-    analyze_btn = st.button("Scan Article Legitimacy", type="primary", use_container_width=True)
+    analyze_btn = st.button("Audit and Verify Legitimacy", type="primary", use_container_width=True)
 
 with col_results:
     st.markdown("""
     <div>
-        <h3 style='font-weight: 700; font-size: 1.5rem; color: #f1f5f9;'>Real-time Diagnostic Output</h3>
-        <p style='color: #64748b; font-size: 0.9rem;'>Telemetry and prediction confidence metrics.</p>
+        <h3 style='font-weight: 700; font-size: 1.5rem; color: #f1f5f9;'>Diagnostic Audit Suite</h3>
+        <p style='color: #64748b; font-size: 0.9rem;'>Consensus statistics across the classifier portfolio.</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -198,7 +219,7 @@ with col_results:
             st.error("Please insert a valid text sample to analyze.")
         else:
             with st.spinner("Decoding language vectors..."):
-                # Clean and Tokenize
+                # 1. Preprocess using optimized module regexes
                 cleaned_text = full_preprocess_pipeline(article_text)
                 
                 # Metric Calculations
@@ -206,37 +227,78 @@ with col_results:
                 cleaned_word_count = len(cleaned_text.split())
                 removed_words = original_word_count - cleaned_word_count
                 
-                # Transform & Predict
+                # 2. TF-IDF Vectorization
                 vectorizer = assets["vectorizer"]
                 vectorized_input = vectorizer.transform([cleaned_text])
                 
-                model = assets[selected_model_key]
-                prediction = model.predict(vectorized_input)[0]
-                probabilities = model.predict_proba(vectorized_input)[0]
+                # Compute top local terms based on TF-IDF weights in this document
+                feature_names = np.array(vectorizer.get_feature_names_out())
+                feature_indices = vectorized_input.tocoo().col
+                feature_values = vectorized_input.tocoo().data
                 
-                # Visual Verdict Card
+                # Match tokens to scores
+                top_tokens = []
+                if len(feature_values) > 0:
+                    sorted_indices = np.argsort(feature_values)[::-1]
+                    top_tokens = [(feature_names[feature_indices[idx]], feature_values[idx]) for idx in sorted_indices[:8]]
+                
+                # 3. Model Predict Suite (Run predictions on all 4 models)
+                model_configs = {
+                    "Logistic Regression": "logreg",
+                    "Random Forest": "random_forest",
+                    "MLP Neural Net": "neuralnet",
+                    "K-Nearest Neighbors": "knn"
+                }
+                
+                predictions_summary = []
+                for name, key in model_configs.items():
+                    model = assets[key]
+                    pred = model.predict(vectorized_input)[0]
+                    probs = model.predict_proba(vectorized_input)[0]
+                    confidence = probs[pred] * 100
+                    predictions_summary.append((name, pred, confidence))
+                
+                # UI Layout - Consensus Grid
                 st.markdown("<div class='card'>", unsafe_allow_html=True)
-                if prediction == 1:
-                    st.markdown("<div class='verdict-badge badge-real'>🛡️ Verified Real</div>", unsafe_allow_html=True)
-                    confidence = probabilities[1] * 100
-                else:
-                    st.markdown("<div class='verdict-badge badge-fake'>⚠️ Flagged Fake</div>", unsafe_allow_html=True)
-                    confidence = probabilities[0] * 100
+                st.markdown("<h4 style='margin-top:0; margin-bottom:1rem; font-weight:600; font-size:1.1rem; color: #c084fc;'>Model Consensus Panel</h4>", unsafe_allow_html=True)
                 
-                st.markdown(f"<h3 style='margin: 0; font-weight: 700; font-size: 2.2rem;'>{confidence:.1f}% <span style='font-size: 1rem; color: #64748b;'>confidence</span></h3>", unsafe_allow_html=True)
-                st.progress(confidence / 100.0)
-                st.caption(f"Evaluated via {model_option}")
+                grid_cols = st.columns(2)
+                for idx, (name, pred, conf) in enumerate(predictions_summary):
+                    col = grid_cols[idx % 2]
+                    with col:
+                        # Render each model's report inside a small container
+                        badge_class = "badge-real-small" if pred == 1 else "badge-fake-small"
+                        badge_label = "Real" if pred == 1 else "Fake"
+                        
+                        st.markdown(f"""
+                        <div style='background-color: #1e293b; padding: 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 0.75rem; text-align: center;'>
+                            <div style='font-size: 0.85rem; font-weight:600; color: #94a3b8;'>{name}</div>
+                            <div class='verdict-badge-small {badge_class}'>{badge_label}</div>
+                            <div style='font-size: 0.95rem; font-weight: 700; margin-top: 0.25rem; color: #f1f5f9;'>{conf:.1f}% conf</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                 st.markdown("</div>", unsafe_allow_html=True)
                 
-                # Diagnostics Card
+                # UI Layout - Key Predictive Features
                 st.markdown("<div class='card'>", unsafe_allow_html=True)
-                st.markdown("<h4 style='margin-top:0; margin-bottom:1rem; font-weight:600; font-size:1.1rem; color: #818cf8;'>Linguistic Diagnostic Telemetry</h4>", unsafe_allow_html=True)
+                st.markdown("<h4 style='margin-top:0; margin-bottom:0.75rem; font-weight:600; font-size:1.1rem; color: #818cf8;'>Strongest TF-IDF Vocabulary Weights</h4>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size: 0.8rem; color: #64748b; margin-top:-0.5rem; margin-bottom:1rem;'>Terms in this article that carried the highest mathematical variance.</p>", unsafe_allow_html=True)
                 
+                if top_tokens:
+                    tags_html = "".join([f"<span class='keyword-tag'>{word} ({score:.2f})</span>" for word, score in top_tokens])
+                    st.markdown(tags_html, unsafe_allow_html=True)
+                else:
+                    st.markdown("<p style='font-size: 0.85rem; color: #64748b;'>No significant feature matches found in text.</p>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+                
+                # UI Layout - Diagnostic Telemetry
+                st.markdown("<div class='card'>", unsafe_allow_html=True)
+                st.markdown("<h4 style='margin-top:0; margin-bottom:1rem; font-weight:600; font-size:1.1rem; color: #f472b6;'>Linguistic Telemetry</h4>", unsafe_allow_html=True)
                 metric_col1, metric_col2 = st.columns(2)
                 with metric_col1:
-                    st.metric("Raw Word Count", original_word_count)
+                    st.metric("Raw Words", original_word_count)
                 with metric_col2:
-                    st.metric("Filtered Out (Stopwords)", removed_words)
+                    st.metric("Stopwords Removed", removed_words)
                     
                 with st.expander("Show Tokenized Input Stream"):
                     st.write(cleaned_text if cleaned_text else "*[All text stripped as stopwords or empty]*")
@@ -244,8 +306,9 @@ with col_results:
     else:
         # Default placeholder card
         st.markdown("""
-        <div style='background-color: #111827; border-radius: 20px; padding: 3rem 2rem; border: 1px dashed rgba(255, 255, 255, 0.1); text-align: center; color: #64748b;'>
-            <img src='https://img.icons8.com/nolan/64/combo-chart.png' style='opacity: 0.5; margin-bottom: 1rem;'/>
-            <p style='margin: 0; font-size: 0.95rem;'>Awaiting text input stream to initialize classification models...</p>
+        <div style='background-color: #111827; border-radius: 20px; padding: 4rem 2rem; border: 1px dashed rgba(255, 255, 255, 0.1); text-align: center; color: #64748b; min-height: 400px; display: flex; flex-direction: column; justify-content: center; align-items: center;'>
+            <img src='https://img.icons8.com/nolan/64/combo-chart.png' style='opacity: 0.5; margin-bottom: 1.5rem;'/>
+            <h4 style='color: #94a3b8; font-weight:600; margin-bottom:0.5rem;'>Workspace Awaiting Audits</h4>
+            <p style='margin: 0; font-size: 0.9rem; max-width: 320px;'>Input a text stream in the workspace and select "Audit and Verify" to generate diagnostic stats.</p>
         </div>
         """, unsafe_allow_html=True)
