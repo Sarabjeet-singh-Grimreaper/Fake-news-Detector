@@ -67,11 +67,19 @@ Install the required scientific packages:
 pip install -r requirements.txt
 ```
 
+### 3. 🚀 Quick Start (Detect Fake News Now)
+The machine learning models are **already trained** and saved in your `models/` folder. You do not need to train them again to start using the system.
+
+To launch the interactive website immediately and begin verifying news articles, run:
+```powershell
+streamlit run app.py
+```
+
 ---
 
-## 🔄 Pipeline Workflow Execution
+## 🔄 Pipeline Workflow Execution & Retraining
 
-All project stages are unified inside the single CLI runner `run_pipeline.py`. Use the following command flags:
+If you ever modify the training datasets or want to retrain the models from scratch, all stages are unified inside the single CLI runner `run_pipeline.py`. Use the following command flags:
 
 ### Step 1: Programmatic Data Fetching & Staging
 Downloads and shuffles the raw Kaggle dataset:
