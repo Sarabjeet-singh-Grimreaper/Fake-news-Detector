@@ -6,3 +6,5 @@ seaborn
 jupyter
 openpyxl
 streamlit
+beautifulsoup4
+requests

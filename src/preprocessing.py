@@ -53,14 +53,12 @@ def tokenize_and_filter(text):
     """
     Splits sentences into single words and drops the stopwords.
     """
-    # Break sentence into a list of words using spaces
-    raw_words = text.split(' ')
-    
-    # Keep the word only if it isn't blank and isn't a stopword
-    filtered_words = [word for word in raw_words if word and word not in STOPWORDS]
-    
-    # Glue the cleaned words back together with a single space
-    return " ".join(filtered_words)
+    if not text:
+        return ""
+
+    # Split into words, then filter out any empty strings and stopwords
+    words = text.split(' ')
+    return " ".join([word for word in words if word and word not in STOPWORDS])
 
 def full_preprocess_pipeline(text):
     """
