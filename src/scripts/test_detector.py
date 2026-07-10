@@ -28,7 +28,8 @@ def verify_detector():
         "K-Nearest Neighbors": "knn",
         "Logistic Regression": "logreg",
         "Random Forest": "random_forest",
-        "MLP Neural Network": "neuralnet"
+        "MLP Neural Network": "neuralnet",
+        "Online SGD Classifier": "sgd_online"
     }
     
     # Run predictions

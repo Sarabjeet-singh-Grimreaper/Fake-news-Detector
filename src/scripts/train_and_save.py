@@ -1,38 +1,31 @@
 import os
 import pickle
+import numpy as np
 from src.features import extract_features
 from src.models import get_models
 
 def train_and_save_all():
-    print("[Trainer] Starting full model training and serialization...")
-    
-    # Extract features using full clean dataset
+    print("[Automata Engine] Commencing baseline feature extraction processing...")
     X_train, X_test, y_train, y_test, vectorizer = extract_features()
     
-    # Train all models
-    models = get_models()
+    models_dict = get_models()
+    online_model = models_dict["Online_Logistic_Regression"]
     
-    # Create models directory if it doesn't exist
-    os.makedirs("models", exist_ok=True)
+    print("[Automata Engine] Fitting baseline models using SGD Online Learning paradigms...")
+    # Initialize classes explicitly for subsequent partial_fit streams
+    unique_classes = np.array([0, 1])
     
-    # Save the vectorizer first
-    vectorizer_path = "models/tfidf_vectorizer.pkl"
-    with open(vectorizer_path, "wb") as f:
-        pickle.dump(vectorizer, f)
-    print(f"[Trainer] Saved TF-IDF Vectorizer to: {vectorizer_path}")
+    # Baseline batch training phase
+    online_model.fit(X_train, y_train)
     
-    for name, model in models.items():
-        print(f"[Trainer] Training {name} on the complete training set...")
-        model.fit(X_train, y_train)
-        
-        # Save model
-        safe_name = name.lower().replace(" ", "_")
-        model_path = f"models/{safe_name}_model.pkl"
-        with open(model_path, "wb") as f:
-            pickle.dump(model, f)
-        print(f"[Trainer] Saved {name} model to: {model_path}")
-        
-    print("[Trainer] All models trained and saved successfully!")
+    # Evaluate baseline accuracy on holdout test set split
+    baseline_score = online_model.score(X_test, y_test)
+    print(f"[Automata Engine] Initial Baseline Generalization Accuracy: {baseline_score * 100:.2f}%")
+    
+    # Save the iteration state to disk
+    with open("models/logreg_model.pkl", "wb") as f:
+        pickle.dump(online_model, f)
+    print("[Automata Engine] Models successfully serialized to models/ directory.")
 
 if __name__ == "__main__":
     train_and_save_all()

@@ -1,17 +1,17 @@
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neural_network import MLPClassifier
+from sklearn.linear_model import SGDClassifier
 
 def get_models():
     """
-    Initializes and returns the suite of 4 core classifiers 
-    configured according to the project guidelines.
+    Returns the core Veritas ensemble configurations. 
+    The 'Online_Logistic_Regression' variant natively supports real-time,
+    iterative partial_fit cycles as new worldwide news breaks.
     """
-    models = {
-        "KNN": KNeighborsClassifier(n_neighbors=5),
-        "LogReg": LogisticRegression(max_iter=1000, random_state=42),
-        "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
-        "NeuralNet": MLPClassifier(hidden_layer_sizes=(100,), max_iter=300, random_state=42)
+    return {
+        "Online_Logistic_Regression": SGDClassifier(
+            loss="log_loss",       # Enables predict_proba execution 
+            penalty="l2", 
+            alpha=0.0001, 
+            max_iter=1000, 
+            random_state=42
+        )
     }
-    return models

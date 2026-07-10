@@ -1,7 +1,7 @@
 import pandas as pd
 from src.preprocessing import full_preprocess_pipeline
 
-print("🧪 Testing custom text-cleaning pipeline...")
+print("Testing custom text-cleaning pipeline...")
 
 # Read just the first 2 articles from your combined dataset to test
 df = pd.read_csv("data/processed/combined_news.csv", nrows=2)

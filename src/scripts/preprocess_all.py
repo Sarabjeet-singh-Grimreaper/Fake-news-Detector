@@ -23,8 +23,10 @@ def run_mass_preprocessing():
     
     # Save the polished output to your processed data directory
     output_path = "data/processed/cleaned_news.csv"
+    combined_path = "data/processed/combined_news.csv"
     df[['clean_text', 'label']].to_csv(output_path, index=False)
-    print(f"[Preprocessing] Cleaned dataset successfully saved to: {output_path}")
+    df.to_csv(combined_path, index=False)
+    print(f"[Preprocessing] Cleaned dataset successfully saved to: {output_path} and {combined_path}")
 
 if __name__ == "__main__":
     run_mass_preprocessing()
