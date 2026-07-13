@@ -7,7 +7,7 @@ from src.evaluate import evaluate_model
 # Import utility scripts dynamically from the internal script package
 from src.scripts.stage_data import stage_dataset
 from src.scripts.preprocess_all import run_mass_preprocessing
-from src.scripts.train_and_save import train_and_save_all
+from src.scripts.train_stream import run_stream_training
 from src.scripts.tune_hyperparameters import tune_models
 from src.scripts.error_analysis import run_error_analysis
 from src.scripts.test_detector import verify_detector
@@ -56,7 +56,7 @@ def main():
     elif args.preprocess:
         run_mass_preprocessing()
     elif args.train:
-        train_and_save_all()
+        run_stream_training(epochs=5, chunk_size=5000)
     elif args.tune:
         tune_models(subset_size=5000)
     elif args.analyze:
