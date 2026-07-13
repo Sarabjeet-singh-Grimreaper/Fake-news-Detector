@@ -37,7 +37,7 @@ fake-news-detector/
 │   └── scripts/            # Modular pipeline utility files
 │       ├── stage_data.py   # Downloader and shuffler
 │       ├── preprocess_all.py # Mass cleaner orchestrator
-│       ├── train_and_save.py # Full training & serialization script
+│       ├── train_stream.py # Memory-efficient online/incremental training script
 │       ├── tune_hyperparameters.py # Hyperparameter optimizer
 │       ├── error_analysis.py # Leakage and coefficient examiner
 │       └── test_detector.py # Verification testing script
@@ -93,8 +93,8 @@ Processes all 44,898 raw articles using our custom string engine:
 python run_pipeline.py --preprocess
 ```
 
-### Step 3: Train and Package Model Assets
-Fits the vectorizer and trains all 4 models, saving them under `models/`:
+### Step 3: Progressive Stream Model Training
+Fits the vectorizer and progressively trains the model in memory-efficient increments:
 ```powershell
 python run_pipeline.py --train
 ```
@@ -127,13 +127,21 @@ python run_pipeline.py --test
 
 ---
 
-## 🧪 Real-time Interface (Frontend)
+## 🧪 Real-time Interfaces (Frontend & Ingestion Stream)
 
+### 1. Interactive Custom Portal (Streamlit)
 To launch the modern dark-themed interactive SaaS verification portal in your browser:
 ```powershell
 streamlit run app.py
 ```
-This application allows you to select your preferred model architecture, paste any news article, and review real-time authenticity verdicts and word-telemetry logs.
+This application allows you to paste any news article, scrape URL contents, and cross-evaluate authenticity verdicts dynamically with optimized visual controls.
+
+### 2. Auto-Refreshing RSS Feed Classifier (Flask)
+To start the live Google News RSS feed monitoring dashboard (evaluating new global headlines every 10 seconds):
+```powershell
+python src/realtime_dashboard.py
+```
+Open [http://localhost:5000](http://localhost:5000) in your browser to view the live ingestion feed.
 
 ---
 
