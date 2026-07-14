@@ -1,4 +1,4 @@
-# Veritas AI: AI-Powered Fake News Detection Using Text Classification
+# VerifiQ: AI-Powered Fake News Detection Using Text Classification
 
 Welcome to the documentation for the project **"AI-Powered Fake News Detection Using Text Classification"** developed for the **Summer Internship Program in AI & ML 2026**.
 
@@ -51,31 +51,17 @@ fake-news-detector/
 
 ## ⚙️ Setup and Installation
 
-### 1. Initialize Virtual Environment
-Open your terminal (PowerShell/Command Prompt) in the project directory:
+### 🚀 Simplified Quick Start (One-Click Launch)
+We have provided a unified launcher script to handle the virtual environment creation, package installation, and application launching automatically.
+
+Simply run the batch script from your terminal:
 ```powershell
-# Create virtual environment
-python -m venv venv
-
-# Activate virtual environment (Windows)
-.\venv\Scripts\activate
+.\run.bat
 ```
-
-### 2. Install Required Dependencies
-Install the required scientific packages:
-```powershell
-pip install -r requirements.txt
-```
-
-### 3. 🚀 Quick Start (Detect Fake News Now)
-The machine learning models are **already trained** and saved in your `models/` folder. You do not need to train them again to start using the system.
-
-To launch the interactive website immediately and begin verifying news articles, run:
-```powershell
-streamlit run app.py
-```
+*(Or simply double-click `run.bat` in Windows File Explorer).*
 
 ---
+
 
 ## 🔄 Pipeline Workflow Execution & Retraining
 

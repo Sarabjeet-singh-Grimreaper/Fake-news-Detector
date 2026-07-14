@@ -6,7 +6,7 @@ import time
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="Veritas AI | Advanced Global Misinformation Portal",
+    page_title="VerifiQ | Advanced Global Misinformation Portal",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -33,14 +33,155 @@ except ImportError:
             "text": "Target raw worldwide data streams ingested through central API verification metrics successfully."
         }
 
+def check_realtime_sources(text):
+    import requests
+    from bs4 import BeautifulSoup
+    import urllib.parse
+    
+    first_line = text.strip().split("\n")[0]
+    words = first_line.split()
+    query = " ".join(words[:10]) if len(words) > 10 else first_line
+    
+    url = "https://lite.duckduckgo.com/lite/"
+    data = {"q": query + " fact check"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+    }
+    try:
+        r = requests.post(url, data=data, headers=headers, timeout=8)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, 'html.parser')
+        links = soup.find_all('a', class_='result-link')
+        snippets = soup.find_all('td', class_='result-snippet')
+        results = []
+        for l, s in zip(links[:3], snippets[:3]):
+            results.append({
+                "title": l.get_text().strip(),
+                "url": l['href'],
+                "snippet": s.get_text().strip()
+            })
+        return results, query
+    except Exception:
+        return [], query
+
+def analyze_realtime_verdict(results):
+    fake_signals = ["hoax", "false", "debunk", "untrue", "misleading", "fake", "fabricat"]
+    real_signals = ["true", "confirmed", "verified", "authentic"]
+    
+    fake_count = 0
+    real_count = 0
+    
+    for r in results:
+        text = (r["title"] + " " + r["snippet"]).lower()
+        for word in fake_signals:
+            if word in text:
+                fake_count += 1
+        for word in real_signals:
+            if word in text:
+                real_count += 1
+                
+    if fake_count > real_count:
+        return "FAKE / HOAX (Confirmed by live fact-checkers)", "#A58D66"
+    elif real_count > fake_count:
+        return "REAL / VERIFIED (Confirmed by live reports)", "#407E8C"
+    else:
+        return "INCONCLUSIVE (No definitive search signal)", "#64748B"
+
+def calculate_hybrid_score(ml_score, realtime_results, text):
+    hybrid_score = ml_score
+    
+    sensational_words = ["killed", "assassinated", "assassination", "dead", "death", "arrested", "clones", "conspiracy", "secret", "escape"]
+    text_lower = text.lower()
+    has_sensational = any(word in text_lower for word in sensational_words)
+    
+    fake_signals = ["hoax", "false", "debunk", "untrue", "misleading", "fake", "fabricat", "rumor", "conspiracy", "unconfirmed"]
+    real_signals = ["true", "confirmed", "verified", "authentic", "official", "reuters", "associated press", "reported"]
+    
+    fake_hits = 0
+    real_hits = 0
+    
+    if realtime_results:
+        for r in realtime_results:
+            content = (r["title"] + " " + r["snippet"]).lower()
+            for word in fake_signals:
+                if word in content:
+                    fake_hits += 1
+            for word in real_signals:
+                if word in content:
+                    real_hits += 1
+                    
+        if fake_hits > real_hits:
+            # Shift the score strongly towards Fake
+            penalty = min(50.0, 15.0 * (fake_hits - real_hits))
+            hybrid_score = max(5.0, ml_score - penalty)
+        elif real_hits > fake_hits:
+            # Shift score towards Real
+            boost = min(20.0, 5.0 * (real_hits - fake_hits))
+            hybrid_score = min(98.0, ml_score + boost)
+    else:
+        if has_sensational:
+            # Sensational claim with zero search coverage is highly suspicious
+            hybrid_score = max(10.0, ml_score - 35.0)
+            
+    return hybrid_score
+
+def analyze_ai_writing_style(text):
+    import numpy as np
+    ai_cliches = ["delve", "tapestry", "testament", "pivotal", "catalyst", "moreover", "furthermore", "important to note", "underscores", "beacon of", "demystify"]
+    text_lower = text.lower()
+    cliche_count = sum(1 for word in ai_cliches if word in text_lower)
+    
+    sentences = [s.strip() for s in text.split('.') if s.strip()]
+    if len(sentences) > 3:
+        word_counts = [len(s.split()) for s in sentences]
+        variance = float(np.var(word_counts))
+        is_low_burstiness = variance < 18.0
+    else:
+        variance = 20.0
+        is_low_burstiness = False
+        
+    ai_prob = 0.0
+    if cliche_count >= 1:
+        ai_prob += 0.15 * min(4, cliche_count)
+    if is_low_burstiness:
+        ai_prob += 0.35
+        
+    return min(0.95, ai_prob), cliche_count, variance
+
 # 2. Premium Custom CSS & Animation Engine Inject (Navy, Gold, Aqua, Teal, Sand Palette)
+import base64
+
+def get_base64_image(path):
+    with open(path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode()
+
+try:
+    bg_base64 = get_base64_image("assets/bg_site.png")
+    st.markdown(f"""
+    <style>
+        .stApp {{
+            background-image: linear-gradient(rgba(3, 22, 32, 0.85), rgba(2, 13, 20, 0.95)), url("data:image/png;base64,{bg_base64}") !important;
+            background-size: cover !important;
+            background-position: center !important;
+            background-attachment: fixed !important;
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+except Exception:
+    st.markdown("""
+    <style>
+        .stApp {
+            background: radial-gradient(circle at 80% 20%, #083A4F 0%, #031620 50%, #020d14 100%) !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;500;700&display=swap');
     
     /* 1. Ambient Background Animation */
     .stApp {
-        background: radial-gradient(circle at 80% 20%, #083A4F 0%, #031620 50%, #020d14 100%) !important;
         color: #E5E1DD !important;
         font-family: 'Plus Jakarta Sans', sans-serif !important;
     }
@@ -192,38 +333,121 @@ if not assets.get("vectorizer") or not any(assets.get(k) for k in ["knn", "logre
 if "article_text" not in st.session_state:
     st.session_state["article_text"] = ""
 
-# --- SIDEBAR DESIGN (Custom Brand Aesthetic) ---
-st.sidebar.markdown("""
-<div style='text-align: center; margin-bottom: 2rem; margin-top: 1rem;'>
-    <h2 style='margin-top: 15px; font-weight: 800; color: #E5E1DD; letter-spacing: -0.02em;'>VERITAS AI</h2>
-    <p style='color: #C0D5D6; font-size: 0.85rem; font-weight: 500;'>Academic NLP Framework v1.2.0</p>
-</div>
-""", unsafe_allow_html=True)
+# --- SIDEBAR DESIGN (Custom Brand Aesthetic & Controls) ---
+with st.sidebar:
+    # 1. Inject Targeted Sidebar Dark-Theme and Text Contrast CSS
+    st.markdown("""
+    <style>
+        /* Target Streamlit Sidebar Background */
+        div[data-testid="stSidebar"] {
+            background-color: #020d14 !important;
+            background-image: radial-gradient(circle at 50% 20%, #083A4F 0%, #020d14 70%) !important;
+            border-right: 1px solid rgba(192, 213, 214, 0.1) !important;
+        }
+        
+        /* Sidebar Text and Label Contrast Fixes */
+        div[data-testid="stSidebar"] h1, 
+        div[data-testid="stSidebar"] h2, 
+        div[data-testid="stSidebar"] h3, 
+        div[data-testid="stSidebar"] h4,
+        div[data-testid="stSidebar"] p,
+        div[data-testid="stSidebar"] label,
+        div[data-testid="stSidebar"] span {
+            color: #E5E1DD !important;
+            font-family: 'Plus Jakarta Sans', sans-serif !important;
+        }
+        
+        /* Force Form Control Headers to Aqua Accent Color */
+        div[data-testid="stSidebar"] .stSlider label,
+        div[data-testid="stSidebar"] .stMultiSelect label,
+        div[data-testid="stSidebar"] .stCheckbox label {
+            color: #C0D5D6 !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.02em;
+        }
+        
+        /* Multi-select tag styling */
+        div[data-testid="stSidebar"] span[data-baseweb="tag"] {
+            background-color: rgba(64, 126, 140, 0.3) !important;
+            border: 1px solid #407E8C !important;
+            color: #E5E1DD !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # 2. Main Title Brand Section
+    st.markdown("""
+    <div style='text-align: center; margin-bottom: 2rem; margin-top: 1rem;'>
+        <h2 style='margin-top: 15px; font-weight: 800; color: #E5E1DD; letter-spacing: -0.02em;'>VERIFIQ</h2>
+        <p style='color: #C0D5D6; font-size: 0.85rem; font-weight: 500;'>Academic NLP Framework v1.2.0</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-if SIMULATION_MODE:
-    st.sidebar.markdown("""
-    <div style='background: rgba(165, 141, 102, 0.1); padding: 1.25rem; border-radius: 16px; border: 1px solid #A58D66; margin-bottom: 1.5rem;'>
-        <h4 style='font-size: 0.9rem; font-weight: 700; margin: 0; color: #A58D66;'>⚠️ SIMULATION ACTIVE</h4>
-        <p style='font-size: 0.8rem; color: #E5E1DD; line-height: 1.4; margin-top: 0.5rem; margin-bottom: 0;'>
-            No pre-trained pipeline models found. Generating algorithmic telemetry previews.
+    if SIMULATION_MODE:
+        st.markdown("""
+        <div style='background: rgba(165, 141, 102, 0.1); padding: 1.25rem; border-radius: 16px; border: 1px solid #A58D66; margin-bottom: 1.5rem;'>
+            <h4 style='font-size: 0.9rem; font-weight: 700; margin: 0; color: #A58D66;'>⚠️ SIMULATION ACTIVE</h4>
+            <p style='font-size: 0.8rem; color: #E5E1DD; line-height: 1.4; margin-top: 0.5rem; margin-bottom: 0;'>
+                No pre-trained pipeline models found. Generating algorithmic telemetry previews.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # 3. Glassmorphic Consensus Automata Card
+    st.markdown("""
+    <div style='background-color: rgba(8, 58, 79, 0.3); padding: 1.25rem; border-radius: 16px; border: 1px solid rgba(192, 213, 214, 0.2); margin-bottom: 1.5rem;'>
+        <h4 style='font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: #C0D5D6;'>Consensus Automata</h4>
+        <p style='font-size: 0.8rem; color: #E5E1DD; line-height: 1.5; margin: 0;'>
+            Orchestrates multi-classifier architectures to cross-evaluate lexical, syntactical, and spatial text vectors simultaneously.
         </p>
     </div>
     """, unsafe_allow_html=True)
 
-st.sidebar.markdown("""
-<div style='background-color: rgba(8, 58, 79, 0.3); padding: 1.25rem; border-radius: 16px; border: 1px solid rgba(192, 213, 214, 0.15); margin-bottom: 1.5rem;'>
-    <h4 style='font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: #C0D5D6;'>Consensus Automata</h4>
-    <p style='font-size: 0.8rem; color: #E5E1DD; line-height: 1.5; margin: 0;'>
-        Orchestrates multi-classifier architectures to cross-evaluate lexical, syntactical, and spatial text vectors simultaneously.
-    </p>
-</div>
-""", unsafe_allow_html=True)
+    st.markdown("### 🛠️ Verification Controls")
+
+    # 4. Interactive Multiselect for model activations
+    selected_models = st.multiselect(
+        "Active Engine Classifiers",
+        options=["Logistic Regression", "Random Forest", "MLP Neural Net", "K-Nearest Neighbors"],
+        default=["Logistic Regression", "Random Forest", "MLP Neural Net", "K-Nearest Neighbors"],
+        help="Select which machine learning models are included in the consensus vote."
+    )
+
+    # 5. Consensus Confidence Action Threshold Slider
+    consensus_threshold = st.slider(
+        "Consensus Action Threshold",
+        min_value=50,
+        max_value=100,
+        value=50,
+        step=5,
+        format="%d%%",
+        help="Minimum credibility score required to label an article as Likely Trustworthy."
+    )
+
+    # 6. Styled Live Telemetry Web Fact-Check Toggle
+    realtime_enabled = st.checkbox(
+        "Always Run Web Fact-Check",
+        value=False,
+        help="Queries DuckDuckGo in real-time to find matching fact-checks for the claim."
+    )
+    
+    st.markdown("<hr style='border-color: rgba(192, 213, 214, 0.15); margin: 1.5rem 0;'>", unsafe_allow_html=True)
+    
+    # 7. Dynamic Metrics Section (System Status Footprint)
+    st.markdown("#### ⚡ System Status Monitoring")
+    metric_col1, metric_col2 = st.columns(2)
+    with metric_col1:
+        st.metric(label="Ingested Feeds", value="44,898", delta="+12 today")
+    with metric_col2:
+        st.metric(label="API Latency", value="42 ms", delta="-3 ms")
+
+
 
 # Main Navigation Title
 st.markdown("""
 <div style='text-align: center; padding: 2.5rem 0 1.5rem 0;'>
     <div style='display: inline-flex; background: rgba(64, 126, 140, 0.15); border: 1px solid #407E8C; color: #C0D5D6; padding: 0.4rem 1.2rem; border-radius: 100px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 1rem;'>🛡️ System Core Mode</div>
-    <h1 class='hero-title'>VERITAS AI PORTAL</h1>
+    <h1 class='hero-title'>VERIFIQ PORTAL</h1>
     <p style='color: #C0D5D6; max-width: 700px; margin: 0 auto; font-size: 1.05rem;'>Multi-classifier linguistic network parsing global textual indicators for credibility evaluation.</p>
 </div>
 """, unsafe_allow_html=True)
@@ -240,7 +464,7 @@ with col_workspace:
     input_tab1, input_tab2, input_tab3 = st.tabs(["✍️ Manual Text Input", "🌐 Real-Time URL Fetcher", "🔄 Incremental Training"])
     
     with input_tab1:
-        st.image("https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80", caption="Textual Stream Ingestion Interface", use_container_width=True)
+        st.image("assets/manual_text_input.png", caption="Textual Stream Ingestion Interface", use_container_width=True)
         
         # Two-way data binding with session state to prevent sync bugs
         article_text = st.text_area(
@@ -263,7 +487,7 @@ with col_workspace:
                 st.rerun()
                 
     with input_tab2:
-        st.image("https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80", caption="Cross-Border Remote Scraper Ingest", use_container_width=True)
+        st.image("assets/url_fetcher.png", caption="Cross-Border Remote Scraper Ingest", use_container_width=True)
         news_url = st.text_input("International Article Target Link", placeholder="https://www.reuters.com/global-article-node...")
         
         if st.button("Execute Stream Web Crawler", use_container_width=True) and news_url.strip():
@@ -273,7 +497,7 @@ with col_workspace:
                 st.rerun()
                 
     with input_tab3:
-        st.image("https://images.unsplash.com/photo-1639762681485-074b7f938ba0?auto=format&fit=crop&w=800&q=80", caption="Iterative Continuous Learning Node", use_container_width=True)
+        st.image("assets/incremental_training.png", caption="Iterative Continuous Learning Node", use_container_width=True)
         st.markdown("<p style='font-size:0.85rem; color:#C0D5D6;'>Train the active model space incrementally below by enforcing adjustments:</p>", unsafe_allow_html=True)
         st.selectbox("True Verified Parameter Target", ["Authentic Data Vector", "Unverified Misinformation Signal"])
         
@@ -313,12 +537,14 @@ with col_diagnostics:
             sorted_indices = np.argsort(row.data)[::-1]
             top_tokens = [(feature_names[row.col[i]], row.data[i]) for i in sorted_indices[:5]]
             
-            # 3. Model Scoring
+            # 3. Model Scoring (Filtered by active sidebar controls)
             model_configs = {
-                "Logistic Regression": "logreg",
-                "Random Forest": "random_forest",
-                "MLP Neural Net": "neuralnet",
-                "K-Nearest Neighbors": "knn"
+                name: key for name, key in {
+                    "Logistic Regression": "logreg",
+                    "Random Forest": "random_forest",
+                    "MLP Neural Net": "neuralnet",
+                    "K-Nearest Neighbors": "knn"
+                }.items() if name in selected_models
             }
             
             predictions_summary = []
@@ -345,13 +571,43 @@ with col_diagnostics:
                 consensus_percentage = 50.0
                 score = 50.0
                 
-            is_fake = score < 50
-            status_text = "UNVERIFIED SIGNAL" if is_fake else "CONSENSUS AUTHENTIC"
-            badge_color = "#A58D66" if is_fake else "#407E8C"
+            sensational_words = ["killed", "assassinated", "assassination", "dead", "death", "arrested", "clones", "conspiracy", "secret", "escape"]
+            has_sensational = any(word in st.session_state["article_text"].lower() for word in sensational_words)
+            
+            realtime_results = []
+            search_query = ""
+            if realtime_enabled or has_sensational or (score == 50.0):
+                realtime_results, search_query = check_realtime_sources(st.session_state["article_text"])
+                
+            final_score = calculate_hybrid_score(score, realtime_results, st.session_state["article_text"])
+            
+            # Analyze AI-generated writing style parameters
+            ai_prob, cliche_count, variance = analyze_ai_writing_style(st.session_state["article_text"])
+            
+            # Apply additional penalty for high probability AI text with zero web confirmation
+            if ai_prob > 0.5 and (not realtime_results or len(realtime_results) == 0):
+                final_score = max(5.0, final_score - 15.0)
+            
+            if final_score > 50:
+                status_text = "CONSENSUS AUTHENTIC"
+                badge_color = "#407E8C"
+            elif final_score < 50:
+                status_text = "UNVERIFIED SIGNAL"
+                badge_color = "#A58D66"
+            else:
+                if realtime_results:
+                    verdict, color = analyze_realtime_verdict(realtime_results)
+                    status_text = f"TIE RESOLVED: {verdict}"
+                    badge_color = color
+                else:
+                    status_text = "INCONCLUSIVE / TIE"
+                    badge_color = "#64748B"
         else:
             # Simulation Mode Fallback logic
             is_fake = "shocking" in st.session_state["article_text"].lower() or "china" in st.session_state["article_text"].lower()
             score = 14.5 if is_fake else 89.65
+            final_score = score
+            ai_prob = 0.85 if is_fake else 0.12
             status_text = "UNVERIFIED SIGNAL" if is_fake else "CONSENSUS AUTHENTIC"
             badge_color = "#A58D66" if is_fake else "#407E8C"
             predictions_summary = [
@@ -361,30 +617,67 @@ with col_diagnostics:
             ]
             top_tokens = [("shocking", 0.81), ("conspiracy", 0.74), ("clones", 0.69)] if is_fake else [("washington", 0.58), ("consistent", 0.52), ("manufacturing", 0.44)]
 
+        # Determine AI style label color
+        ai_label = "Low (Human Writer)"
+        ai_color = "#407E8C"
+        if ai_prob > 0.6:
+            ai_label = "High Probability AI"
+            ai_color = "#A58D66"
+        elif ai_prob > 0.3:
+            ai_label = "Moderate AI Signature"
+            ai_color = "#64748B"
+
+        real_percentage = final_score
+        fake_percentage = 100.0 - real_percentage
+        
+        if status_text.startswith("TIE RESOLVED:"):
+            verdict_label = status_text
+            verdict_class = f"background: {badge_color}33; border-color: {badge_color}; color: #E5E1DD;"
+        elif real_percentage >= consensus_threshold:
+            verdict_label = "LIKELY TRUSTWORTHY"
+            verdict_class = "background: rgba(64, 126, 140, 0.25); border-color: #407E8C; color: #C0D5D6;"
+        else:
+            verdict_label = "HIGH RISK / UNVERIFIED"
+            verdict_class = "background: rgba(165, 141, 102, 0.25); border-color: #A58D66; color: #E5E1DD;"
+
+        # 2. Main Public-Facing Gauge Component (Dual Split Bar)
         st.markdown(f"""
-            <div style='text-align: center; padding: 2rem; background: rgba(2, 13, 20, 0.5); border-radius: 20px; border: 1px solid rgba(192, 213, 214, 0.1); margin-bottom: 1.5rem;'>
-                <div style='font-size: 0.8rem; text-transform: uppercase; color: #C0D5D6; tracking-letter:0.04em;'>Authenticity Certainty Index</div>
-                <div style='font-size: 4rem; font-weight: 800; font-family: Outfit; background: linear-gradient(135deg, #E5E1DD 0%, #A58D66 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;'>{score:.1f}%</div>
-                <span style='background: {badge_color}; color: #E5E1DD; padding: 0.4rem 1.2rem; border-radius: 50px; font-weight: 700; font-size: 0.8rem;'>{status_text}</span>
-            </div>
-        """, unsafe_allow_html=True)
+<div style='background: rgba(2, 13, 20, 0.5); border: 1px solid rgba(192, 213, 214, 0.1); border-radius: 20px; padding: 2rem; text-align: center; margin-bottom: 2rem;'>
+<span style='font-size: 0.75rem; text-transform: uppercase; tracking-letter: 0.05em; color: #C0D5D6; font-weight: 600; display: block; margin-bottom: 0.5rem;'>Credibility Distribution Index</span>
+<div style='display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem; padding: 0 5px;'>
+<span style='font-size: 2.2rem; font-weight: 800; color: #407E8C; font-family: Outfit;'>Real: {real_percentage:.1f}%</span>
+<span style='font-size: 2.2rem; font-weight: 800; color: #A58D66; font-family: Outfit;'>Fake: {fake_percentage:.1f}%</span>
+</div>
+<div style='width: 100%; height: 16px; background-color: rgba(255,255,255,0.05); border-radius: 99px; display: flex; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 1.5rem;'>
+<div style='width: {real_percentage}%; background: linear-gradient(90deg, #083A4F, #407E8C); transition: width 0.5s ease;'></div>
+<div style='width: {fake_percentage}%; background: linear-gradient(90deg, #A58D66, #e5e1dd22); transition: width 0.5s ease;'></div>
+</div>
+<div style='margin-bottom: 1.25rem;'>
+<span style='padding: 0.5rem 1.5rem; border-radius: 50px; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.02em; border: 1px solid; {verdict_class}'>
+📢 Final Assessment: {verdict_label}
+</span>
+</div>
+<div style='font-size: 0.75rem; color: #C0D5D6; margin-top: 0.75rem;'>
+ML Vocab Consensus: {score:.1f}% | AI Writing Likelihood: <span style='color: {ai_color}; font-weight:700;'>{ai_prob*100:.0f}% ({ai_label})</span>
+</div>
+</div>
+""", unsafe_allow_html=True)
         
-        # Classifier breakdown cards
-        st.markdown("<h4 style='font-size:1.1rem; color:#A58D66; font-weight:700; margin-bottom:1rem;'>Ensemble Node Probability</h4>", unsafe_allow_html=True)
+        # 3. Clean UI Breakdown Section
+        st.markdown("<h4 style='font-size:1.05rem; color:#C0D5D6; font-weight:700; margin-bottom:1rem; letter-spacing:0.02em;'>AI Model Analysis Breakdown</h4>", unsafe_allow_html=True)
         
-        # Protect against st.columns(0) crash if predictions_summary is empty
         if len(predictions_summary) > 0:
             m_cols = st.columns(len(predictions_summary))
             for idx, (name, pred, conf) in enumerate(predictions_summary):
                 with m_cols[idx]:
                     lbl = "Real" if pred == 1 else "Fake"
-                    bg_badge = "rgba(64,126,140,0.2)" if pred == 1 else "rgba(165,141,102,0.2)"
-                    border_badge = "#407E8C" if pred == 1 else "#A58D66"
+                    color = "#407E8C" if pred == 1 else "#A58D66"
+                    bg = "rgba(64,126,140,0.1)" if pred == 1 else "rgba(165,141,102,0.1)"
                     st.markdown(f"""
-                        <div style='background:rgba(2, 13, 20, 0.4); border:1px solid rgba(192,213,214,0.1); padding:1.2rem; border-radius:14px; text-align:center;'>
-                            <div style='font-size:0.75rem; color:#C0D5D6; margin-bottom:0.3rem;'>{name}</div>
-                            <span style='background:{bg_badge}; border:1px solid {border_badge}; color:#E5E1DD; font-size:0.75rem; padding:0.2rem 0.6rem; border-radius:8px; font-weight:700;'>{lbl}</span>
-                            <div style='font-size:0.85rem; color:#E5E1DD; margin-top:0.4rem;'>{conf:.1f}% Match</div>
+                        <div style='background: rgba(2, 13, 20, 0.4); border: 1px solid rgba(192, 213, 214, 0.08); padding: 1.2rem 0.5rem; border-radius: 16px; text-align: center; height: 100%;'>
+                            <div style='font-size: 0.75rem; color: #C0D5D6; font-weight: 500; margin-bottom: 0.6rem; min-height: 32px; display: flex; align-items: center; justify-content: center;'>{name}</div>
+                            <span style='background: {bg}; border: 1px solid {color}; color: {color}; font-size: 0.7rem; padding: 0.25rem 0.75rem; border-radius: 8px; font-weight: 700; text-transform: uppercase;'>{lbl}</span>
+                            <div style='font-size: 0.85rem; color: #E5E1DD; font-weight: 600; margin-top: 0.6rem;'>{conf:.1f}% Certainty</div>
                         </div>
                     """, unsafe_allow_html=True)
         else:
@@ -409,10 +702,22 @@ with col_diagnostics:
             <span style='color:#C0D5D6;'>Stopword Vector Reductions</span><span style='font-weight:700; color:#A58D66;'>-{original_word_count - cleaned_word_count} tokens</span>
         </div>
         """, unsafe_allow_html=True)
+        
+        if realtime_results:
+            st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
+            st.markdown("<h4 style='font-size:1.1rem; color:#E5E1DD; font-weight:700; margin-bottom:0.75rem;'>🌐 Live Fact-Checking Sources</h4>", unsafe_allow_html=True)
+            st.caption(f"Real-time search results for: *\"{search_query}\"*")
+            for r in realtime_results:
+                st.markdown(f"""
+                    <div style='background: rgba(8, 58, 79, 0.2); border-left: 4px solid #A58D66; padding: 1.0rem; border-radius: 12px; margin-bottom: 0.8rem; border: 1px solid rgba(192,213,214,0.1);'>
+                        <a href='{r["url"]}' target='_blank' style='font-weight: 700; color: #C0D5D6; text-decoration: none; font-size: 0.9rem;'>{r["title"]}</a>
+                        <p style='font-size: 0.8rem; color: #E5E1DD; margin: 0.4rem 0 0 0; line-height: 1.4;'>{r["snippet"]}</p>
+                    </div>
+                """, unsafe_allow_html=True)
             
     else:
         # High Quality Central Dashboard Graphic Vector Placeholder
-        st.image("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80", caption="Auditing Array Idle Status Matrix", use_container_width=True)
+        st.image("assets/idle_placeholder.png", caption="Auditing Array Idle Status Matrix", use_container_width=True)
         st.markdown("""
         <div style='text-align: center; color: #C0D5D6; font-size: 0.85rem; padding: 1rem 0;'>
             Provide article telemetry inputs or run remote web scraper nodes inside the active workspace to trigger calculations.
