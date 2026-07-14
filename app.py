@@ -3,6 +3,7 @@ import pickle
 import pandas as pd
 import numpy as np
 import time
+import os
 
 # 1. Page Configuration
 st.set_page_config(
@@ -319,7 +320,8 @@ def load_assets():
         try:
             with open(f"models/{m}_model.pkl", "rb") as f:
                 assets[m] = pickle.load(f)
-        except FileNotFoundError:
+        except Exception as e:
+            # Catch unpickling and missing file errors safely
             assets[m] = None
     return assets
 
@@ -461,7 +463,7 @@ with col_workspace:
     st.markdown("<p class='workspace-desc'>Ingest real-time text streams or remote article URLs directly into the audit pipelines.</p>", unsafe_allow_html=True)
     
     # Visual Anchors Inside Workspace Tabs
-    input_tab1, input_tab2, input_tab3 = st.tabs(["✍️ Manual Text Input", "🌐 Real-Time URL Fetcher", "🔄 Incremental Training"])
+    input_tab1, input_tab2, input_tab3, input_tab4 = st.tabs(["✍️ Manual Text Input", "🌐 Real-Time URL Fetcher", "🔄 Incremental Training", "🧠 Self-Learning & Drift"])
     
     with input_tab1:
         st.image("assets/manual_text_input.png", caption="Textual Stream Ingestion Interface", use_container_width=True)
@@ -503,6 +505,59 @@ with col_workspace:
         
         if st.button("Submit Pattern Correction Matrix", use_container_width=True):
             st.toast("Model gradients adjusted smoothly via online SGD backstep.", icon="🔄")
+
+    with input_tab4:
+        st.markdown("### 🧠 Continuous Active Learning Engine")
+        
+        # Load drift reviews
+        drift_file = "data/drift_review.json"
+        drift_records = []
+        if os.path.exists(drift_file):
+            try:
+                with open(drift_file, "r", encoding="utf-8") as f:
+                    drift_records = json.load(f)
+            except Exception:
+                drift_records = []
+                
+        st.metric(label="Flagged Drift Anomalies", value=str(len(drift_records)), delta="Requires reinforcement labels")
+        
+        if drift_records:
+            st.markdown("#### Flagged Articles awaiting reinforcement labels:")
+            latest = drift_records[-1]
+            st.info(f"**Title:** {latest.get('title', 'N/A')}\n\n**Confidence:** {latest.get('confidence', 0.0)*100:.1f}%\n\n**Excerpt:** {latest.get('text', '')[:250]}...")
+            
+            col_left, col_right = st.columns(2)
+            with col_left:
+                if st.button("Verify as Authentic News", key="drift_real", use_container_width=True):
+                    if assets.get("logreg"):
+                        from src.scripts.autonomous_engine import extract_hybrid_features, MODEL_PATH
+                        model = assets["logreg"]
+                        # Ensure shape expansion compatibility
+                        x_sparse = extract_hybrid_features(latest.get('text', ''), assets["vectorizer"])
+                        model.partial_fit(x_sparse, np.array([1]), classes=np.array([0, 1]))
+                        with open(MODEL_PATH, "wb") as f:
+                            pickle.dump(model, f)
+                        drift_records.pop()
+                        with open(drift_file, "w", encoding="utf-8") as f:
+                            json.dump(drift_records, f, indent=2)
+                        st.toast("Model reinforced with authentic news vector!", icon="🧠")
+                        st.rerun()
+            with col_right:
+                if st.button("Flag as Misinformation", key="drift_fake", use_container_width=True):
+                    if assets.get("logreg"):
+                        from src.scripts.autonomous_engine import extract_hybrid_features, MODEL_PATH
+                        model = assets["logreg"]
+                        x_sparse = extract_hybrid_features(latest.get('text', ''), assets["vectorizer"])
+                        model.partial_fit(x_sparse, np.array([0]), classes=np.array([0, 1]))
+                        with open(MODEL_PATH, "wb") as f:
+                            pickle.dump(model, f)
+                        drift_records.pop()
+                        with open(drift_file, "w", encoding="utf-8") as f:
+                            json.dump(drift_records, f, indent=2)
+                        st.toast("Model reinforced with misinformation signature!", icon="🧠")
+                        st.rerun()
+        else:
+            st.success("No flagged drift anomalies. Active learning core is fully aligned.")
             
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     analyze_btn = st.button("Audit and Verify Legitimacy Flow", use_container_width=True)
@@ -551,8 +606,40 @@ with col_diagnostics:
             for name, key in model_configs.items():
                 model = assets[key]
                 if not model: continue
-                pred = model.predict(vectorized_input)[0]
-                probs = model.predict_proba(vectorized_input)[0]
+                
+                # Check expected feature count dynamically to handle 5000 vs 5004 dimensions
+                expected_features = getattr(model, "n_features_in_", None)
+                if expected_features is None and hasattr(model, "coef_") and model.coef_ is not None:
+                    expected_features = model.coef_.shape[1]
+                    
+                if expected_features == len(vectorizer.get_feature_names_out()) + 4:
+                    import scipy.sparse as sp
+                    raw_text = st.session_state["article_text"]
+                    
+                    if not raw_text:
+                        cap_ratio = 0.0
+                        punct_density = 0.0
+                        avg_word_len = 0.0
+                        sentiment_bias = 0.0
+                    else:
+                        letters_only = [c for c in raw_text if c.isalpha()]
+                        cap_ratio = (sum(1 for c in letters_only if c.isupper()) / len(letters_only)) if letters_only else 0.0
+                        excl_q_count = raw_text.count('!') + raw_text.count('?')
+                        punct_density = excl_q_count / len(raw_text)
+                        words = raw_text.split()
+                        avg_word_len = (sum(len(w) for w in words) / len(words)) if words else 0.0
+                        
+                        from src.scripts.autonomous_engine import compute_sentiment_bias
+                        sentiment_bias = compute_sentiment_bias(raw_text)
+                        
+                    dense_features = np.array([[cap_ratio, punct_density, avg_word_len, sentiment_bias]], dtype=np.float64)
+                    dense_sparse = sp.csr_matrix(dense_features)
+                    model_input = sp.hstack([vectorized_input, dense_sparse], format="csr")
+                else:
+                    model_input = vectorized_input
+                    
+                pred = model.predict(model_input)[0]
+                probs = model.predict_proba(model_input)[0]
                 predictions_summary.append((name, pred, probs[pred] * 100))
                 
             total_votes = len(predictions_summary)
