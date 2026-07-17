@@ -65,17 +65,18 @@ Modern digital landscapes suffer from information asymmetry, where fabricated cl
 
 ## 🛠️ The Modern Tech Stack & Architectural Purpose
 
-Every layer of VerifIQ has been chosen to optimize performance, minimize latency, and run efficiently on both desktop and mobile devices.
+Every layer of VerifIQ has been chosen to optimize performance, minimize latency, and run efficiently on both desktop and mobile devices:
 
-| Tech Component | Type / Layer | Exact Functional Value & Purpose |
-| :--- | :--- | :--- |
-| **Python** | Foundation | Backs the core scientific pipelines, custom regex automata, data orchestration, and mathematical feature modeling. |
-| **Streamlit** | Portal UI | Houses the interactive, dark-themed diagnostic dashboard, styled via custom CSS overrides to form a premium glassmorphic interface. |
-| **HTML5 Canvas / CSS3 / JS** | Simulator Frontend | Provides a fully responsive, mobile-optimized simulation representing news propagation, high-DPI scaling, and multi-touch interactions. |
-| **Scikit-Learn (SGDClassifier)** | Online Learning | The streaming machine learning brain; trained with a log-loss objective function to dynamically perform probability estimations and online active updates. |
-| **Scikit-Learn (TfidfVectorizer)** | Text Vectorizer | Maps tokenized streams into 5,000 spatial vocabulary columns, measuring weight variations using TF-IDF. |
-| **BeautifulSoup4 & Requests** | Web Crawler | Powers the live URL parsing pipeline, executing asynchronous page scraping across any target domain. |
-| **SciPy (Sparse Modules)** | Matrix Operations | Horizontally concatenates mismatched matrices (5,000-dim sparse TF-IDF vectors + 4-dim dense metadata arrays) without memory exhaustion. |
+* **🐍 Python (Core Backend & ML Operations):** The fundamental programming language powering the entire scientific data science pipeline. It orchestrates the ingestion of news articles, executes the preprocess regular expression loops, runs evaluations, computes metrics, and serializes the resulting models.
+* **📊 Streamlit (Diagnostic & AI Portal UI):** A lightweight Python framework designed to build high-performance data portals. It acts as the primary interface for users to enter custom articles, crawl URLs, trigger the dynamic models, and view consensus classification metrics. Injected CSS overrides are applied to style the portal as a premium dark glassmorphic interface.
+* **🌐 HTML5 Canvas, CSS3, & Vanilla JavaScript (Visual Information Flow Simulator):** High-performance, client-side rendering engine deployed on GitHub Pages to simulate particle physics and information propagation. It handles high-DPI (Retina) displays, adjusts viewport bounds dynamically, maps desktop pointer controls to mobile touches, and uses `touch-action: none` to isolate gesture events.
+* **🧠 Scikit-Learn (Vectorization & Modeling Core):**
+  * *TfidfVectorizer:* Translates clean text strings into **5,000 spatial language fields** (TF-IDF sparse matrices) based on inverse document frequency weights.
+  * *SGDClassifier:* Deployed with a log-loss objective function. It serves as the incremental active learning engine, using the `partial_fit` API to adjust gradients and write updated model weights to disk dynamically without needing a full batch training rebuild.
+  * *Classifiers (Random Forest, MLP, KNN, Logistic Regression):* Run in parallel to perform ensemble predictions and output consensus verdicts.
+* **⚡ SciPy Sparse Modules (Matrix Operations):** Integrates the 5,000-dimensional text vectors with the 4-dimensional dense metadata parameters using `scipy.sparse.hstack`. This prevents memory crashes when working with high-dimensional matrices.
+* **🕸️ BeautifulSoup4 & Requests (Asynchronous Web Scraping):** Sends HTTP requests to any article URL, fetches the raw HTML page, filters structural markup, and extracts the core textual elements for validation.
+* **🚀 GitHub Actions & GitHub Pages (DevOps & CI/CD Deployment):** Automatically tests, packages, and deploys the static Canvas simulation assets to the web on every git push to the main branch via a secure workflow.
 
 ---
 
