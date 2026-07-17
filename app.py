@@ -591,8 +591,19 @@ with col_diagnostics:
         for key in model_keys:
             active_model = assets.get(key)
             if active_model is not None:
-                pred = active_model.predict(final_input)[0]
-                probs = active_model.predict_proba(final_input)[0]
+                # Dynamic feature alignment to prevent mismatches
+                current_input = final_input
+                if hasattr(active_model, "n_features_in_"):
+                    expected = active_model.n_features_in_
+                    actual = current_input.shape[1]
+                    if actual > expected:
+                        current_input = current_input[:, :expected]
+                    elif actual < expected:
+                        padding = sp.csr_matrix((current_input.shape[0], expected - actual))
+                        current_input = sp.hstack([current_input, padding], format="csr")
+                
+                pred = active_model.predict(current_input)[0]
+                probs = active_model.predict_proba(current_input)[0]
                 confidence = probs[pred] * 100
                 predictions_summary.append((model_labels[key], pred, confidence, probs[1] * 100))
         
