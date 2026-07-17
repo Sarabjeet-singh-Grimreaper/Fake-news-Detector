@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VerifiQ Simulation | Particle Information Flow & Fake News Dynamics</title>
+    <meta name="description" content="An interactive, high-performance HTML5 canvas particle physics simulation illustrating the propagation, collision, and verification of real vs. fake news articles in an information network.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Background Canvas for Physics Simulation -->
+    <canvas id="simulation-canvas"></canvas>
+
+    <!-- Glassmorphic Dashboard Overlay -->
+    <main class="dashboard">
+        <header class="header">
+            <div class="logo">
+                <span class="shield-icon">🛡️</span>
+                <h1>VerifiQ <span class="accent-text">Simulate</span></h1>
+            </div>
+            <p class="subtitle">Real-time particle dynamics representing information propagation, classification, and truth clustering.</p>
+            
+            <!-- Live Portal Navigation Link -->
+            <a href="https://fake-news-detector-sarabjeet2448060.streamlit.app/" id="streamlit-app-link" target="_blank" class="btn-portal">
+                Launch Live AI Portal 🚀
+            </a>
+        </header>
+
+        <!-- Dynamic Metrics Grid -->
+        <section class="metrics-grid">
+            <div class="metric-card real" id="card-real">
+                <span class="dot"></span>
+                <span class="label">Verified Real</span>
+                <span class="value" id="count-real">0</span>
+            </div>
+            <div class="metric-card fake" id="card-fake">
+                <span class="dot"></span>
+                <span class="label">Misinformation</span>
+                <span class="value" id="count-fake">0</span>
+            </div>
+            <div class="metric-card unverified" id="card-unverified">
+                <span class="dot"></span>
+                <span class="label">Unverified Propagation</span>
+                <span class="value" id="count-unverified">0</span>
+            </div>
+        </section>
+
+        <!-- Interactive Control Panel -->
+        <section class="control-panel">
+            <h2 class="section-title">Simulation Controls</h2>
+            
+            <div class="control-group">
+                <label for="control-interaction">Pointer Interaction</label>
+                <select id="control-interaction" class="styled-select">
+                    <option value="repel">Repulsion Wave (Push)</option>
+                    <option value="attract">Gravity Well (Pull)</option>
+                    <option value="spawn">Spawn Articles (Emit)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <div class="label-row">
+                    <label for="control-density">Information Density</label>
+                    <span class="slider-value" id="density-val">150</span>
+                </div>
+                <input type="range" id="control-density" min="20" max="400" value="150" class="styled-slider">
+            </div>
+
+            <div class="control-group">
+                <div class="label-row">
+                    <label for="control-speed">Propagation Speed</label>
+                    <span class="slider-value" id="speed-val">1.0x</span>
+                </div>
+                <input type="range" id="control-speed" min="0.1" max="3" step="0.1" value="1.0" class="styled-slider">
+            </div>
+
+            <div class="button-row">
+                <button id="btn-reset" class="btn btn-secondary">Reset Simulation</button>
+                <button id="btn-inject" class="btn btn-primary">Inject Fake News Burst</button>
+            </div>
+        </section>
+
+        <!-- Instructions Footer -->
+        <footer class="footer">
+            <p>💡 <strong>Interactivity:</strong> Click or touch the canvas to interact with the news particles. Drag to create vector flows. Optimized for both desktop cursor and multi-touch devices.</p>
+        </footer>
+    </main>
+    
+    <!-- Script -->
+    <script src="app.js"></script>
+</body>
+</html>

@@ -4,6 +4,13 @@ import pandas as pd
 import numpy as np
 import time
 import os
+import scipy.sparse as sp
+import re
+import base64
+
+# Import pipeline components
+from src.preprocessing import full_preprocess_pipeline
+from src.scraper import scrape_article
 
 # 1. Page Configuration
 st.set_page_config(
@@ -13,31 +20,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Robust Simulation Fallbacks
+# Active mode configuration (strictly live, no simulation fallbacks)
 SIMULATION_MODE = False
-try:
-    from src.preprocessing import full_preprocess_pipeline
-except ImportError:
-    SIMULATION_MODE = True
-    def full_preprocess_pipeline(text):
-        words = text.lower().split()
-        stopwords = {"the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "to", "of", "in", "for", "on", "with", "at", "by", "from"}
-        return " ".join([w for w in words if w.isalnum() and w not in stopwords])
 
-try:
-    from src.scraper import scrape_article
-except ImportError:
-    def scrape_article(url):
-        time.sleep(1.2)
-        return {
-            "title": "Global Analytics Dynamic Feed Processing",
-            "text": "Target raw worldwide data streams ingested through central API verification metrics successfully."
-        }
+# Simple local emotional keywords for sentiment bias calculation
+EMOTIONAL_WORDS = {'shocking', 'conspiracy', 'leaked', 'secret', 'urgent', 'viral'}
 
 def check_realtime_sources(text):
     import requests
     from bs4 import BeautifulSoup
-    import urllib.parse
     
     first_line = text.strip().split("\n")[0]
     words = first_line.split()
@@ -112,22 +103,18 @@ def calculate_hybrid_score(ml_score, realtime_results, text):
                     real_hits += 1
                     
         if fake_hits > real_hits:
-            # Shift the score strongly towards Fake
             penalty = min(50.0, 15.0 * (fake_hits - real_hits))
             hybrid_score = max(5.0, ml_score - penalty)
         elif real_hits > fake_hits:
-            # Shift score towards Real
             boost = min(20.0, 5.0 * (real_hits - fake_hits))
             hybrid_score = min(98.0, ml_score + boost)
     else:
         if has_sensational:
-            # Sensational claim with zero search coverage is highly suspicious
             hybrid_score = max(10.0, ml_score - 35.0)
             
     return hybrid_score
 
 def analyze_ai_writing_style(text):
-    import numpy as np
     ai_cliches = ["delve", "tapestry", "testament", "pivotal", "catalyst", "moreover", "furthermore", "important to note", "underscores", "beacon of", "demystify"]
     text_lower = text.lower()
     cliche_count = sum(1 for word in ai_cliches if word in text_lower)
@@ -149,13 +136,11 @@ def analyze_ai_writing_style(text):
         
     return min(0.95, ai_prob), cliche_count, variance
 
-# 2. Premium Custom CSS & Animation Engine Inject (Navy, Gold, Aqua, Teal, Sand Palette)
-import base64
-
 def get_base64_image(path):
     with open(path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode()
 
+# CSS Injections
 try:
     bg_base64 = get_base64_image("assets/bg_site.png")
     st.markdown(f"""
@@ -181,18 +166,16 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;500;700&display=swap');
     
-    /* 1. Ambient Background Animation */
     .stApp {
         color: #E5E1DD !important;
         font-family: 'Plus Jakarta Sans', sans-serif !important;
     }
     
-    /* 2. Microinteractions & Glassmorphic Workspace Cards */
     div[data-testid="stVerticalBlock"] > div.element-container:has(div.premium-card) {
         background: linear-gradient(135deg, rgba(8, 58, 79, 0.25) 0%, rgba(3, 22, 32, 0.6) 100%) !important;
         backdrop-filter: blur(25px) !important;
         -webkit-backdrop-filter: blur(25px) !important;
-        border: 1px solid rgba(192, 213, 214, 0.15) !important; /* Aqua border */
+        border: 1px solid rgba(192, 213, 214, 0.15) !important;
         border-radius: 24px !important;
         padding: 2.2rem !important;
         box-shadow: 0 20px 50px rgba(2, 13, 20, 0.6) !important;
@@ -201,12 +184,11 @@ st.markdown("""
     }
     
     div[data-testid="stVerticalBlock"] > div.element-container:has(div.premium-card):hover {
-        border-color: rgba(165, 141, 102, 0.5) !important; /* Gold hover border */
+        border-color: rgba(165, 141, 102, 0.5) !important;
         transform: translateY(-4px) scale(1.005) !important;
-        box-shadow: 0 30px 60px rgba(64, 126, 140, 0.25) !important; /* Teal glow */
+        box-shadow: 0 30px 60px rgba(64, 126, 140, 0.25) !important;
     }
 
-    /* 3. Text Clipping Fix & Hover Button Web Animations */
     div.stButton > button {
         background: linear-gradient(135deg, #407E8C 0%, #083A4F 60%, #A58D66 100%) !important;
         color: #E5E1DD !important;
@@ -232,12 +214,11 @@ st.markdown("""
 
     div.stButton > button:hover {
         transform: translateY(-3px) scale(1.02) !important;
-        box-shadow: 0 12px 28px rgba(165, 141, 102, 0.5) !important; /* Gold shadow bump */
+        box-shadow: 0 12px 28px rgba(165, 141, 102, 0.5) !important;
         border-color: #A58D66 !important;
         color: #ffffff !important;
     }
     
-    /* 4. Interactive Tabs / Custom Layout Toggles */
     div[data-baseweb="tab-list"] {
         background-color: rgba(2, 13, 20, 0.7) !important;
         border-radius: 14px !important;
@@ -258,7 +239,6 @@ st.markdown("""
         border-bottom: 2px solid #A58D66 !important;
     }
 
-    /* 5. Typography & Shimmer Effects */
     .hero-title {
         font-size: 3.6rem;
         font-weight: 800;
@@ -280,28 +260,9 @@ st.markdown("""
         border: 1px solid rgba(192, 213, 214, 0.15);
         object-fit: cover;
     }
-
-    /* Custom scrollbar adjustments */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #020d14; }
-    ::-webkit-scrollbar-thumb { background: #407E8C; border-radius: 99px; }
-    ::-webkit-scrollbar-thumb:hover { background: #A58D66; }
-
-    /* Keyword Tags custom visuals */
-    .keyword-tag {
-        display: inline-flex;
-        align-items: center;
-        background: rgba(64, 126, 140, 0.12);
-        border: 1px solid rgba(192, 213, 214, 0.2);
-        color: #C0D5D6;
-        padding: 0.35rem 0.8rem;
-        border-radius: 8px;
-        font-size: 0.8rem;
-        margin-right: 0.5rem;
-        margin-bottom: 0.5rem;
-        font-weight: 600;
-        font-family: 'Outfit', sans-serif;
-    }
+    ::-webkit-scrollbar-track { background: rgba(2, 13, 20, 0.2); }
+    ::-webkit-scrollbar-thumb { background: rgba(64, 126, 140, 0.4); border-radius: 99px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -320,34 +281,25 @@ def load_assets():
         try:
             with open(f"models/{m}_model.pkl", "rb") as f:
                 assets[m] = pickle.load(f)
-        except Exception as e:
-            # Catch unpickling and missing file errors safely
+        except Exception:
             assets[m] = None
     return assets
 
 assets = load_assets()
 
-# If vectorizer is missing or all models are missing, fallback to simulation mode
-if not assets.get("vectorizer") or not any(assets.get(k) for k in ["knn", "logreg", "random_forest", "neuralnet"]):
-    SIMULATION_MODE = True
-
 # Initialize Session State
 if "article_text" not in st.session_state:
     st.session_state["article_text"] = ""
 
-# --- SIDEBAR DESIGN (Custom Brand Aesthetic & Controls) ---
+# Sidebar Layout Design
 with st.sidebar:
-    # 1. Inject Targeted Sidebar Dark-Theme and Text Contrast CSS
     st.markdown("""
     <style>
-        /* Target Streamlit Sidebar Background */
         div[data-testid="stSidebar"] {
             background-color: #020d14 !important;
             background-image: radial-gradient(circle at 50% 20%, #083A4F 0%, #020d14 70%) !important;
             border-right: 1px solid rgba(192, 213, 214, 0.1) !important;
         }
-        
-        /* Sidebar Text and Label Contrast Fixes */
         div[data-testid="stSidebar"] h1, 
         div[data-testid="stSidebar"] h2, 
         div[data-testid="stSidebar"] h3, 
@@ -358,8 +310,6 @@ with st.sidebar:
             color: #E5E1DD !important;
             font-family: 'Plus Jakarta Sans', sans-serif !important;
         }
-        
-        /* Force Form Control Headers to Aqua Accent Color */
         div[data-testid="stSidebar"] .stSlider label,
         div[data-testid="stSidebar"] .stMultiSelect label,
         div[data-testid="stSidebar"] .stCheckbox label {
@@ -367,8 +317,6 @@ with st.sidebar:
             font-weight: 700 !important;
             letter-spacing: 0.02em;
         }
-        
-        /* Multi-select tag styling */
         div[data-testid="stSidebar"] span[data-baseweb="tag"] {
             background-color: rgba(64, 126, 140, 0.3) !important;
             border: 1px solid #407E8C !important;
@@ -377,7 +325,6 @@ with st.sidebar:
     </style>
     """, unsafe_allow_html=True)
     
-    # 2. Main Title Brand Section
     st.markdown("""
     <div style='text-align: center; margin-bottom: 2rem; margin-top: 1rem;'>
         <h2 style='margin-top: 15px; font-weight: 800; color: #E5E1DD; letter-spacing: -0.02em;'>VERIFIQ</h2>
@@ -385,17 +332,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    if SIMULATION_MODE:
-        st.markdown("""
-        <div style='background: rgba(165, 141, 102, 0.1); padding: 1.25rem; border-radius: 16px; border: 1px solid #A58D66; margin-bottom: 1.5rem;'>
-            <h4 style='font-size: 0.9rem; font-weight: 700; margin: 0; color: #A58D66;'>⚠️ SIMULATION ACTIVE</h4>
-            <p style='font-size: 0.8rem; color: #E5E1DD; line-height: 1.4; margin-top: 0.5rem; margin-bottom: 0;'>
-                No pre-trained pipeline models found. Generating algorithmic telemetry previews.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # 3. Glassmorphic Consensus Automata Card
     st.markdown("""
     <div style='background-color: rgba(8, 58, 79, 0.3); padding: 1.25rem; border-radius: 16px; border: 1px solid rgba(192, 213, 214, 0.2); margin-bottom: 1.5rem;'>
         <h4 style='font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: #C0D5D6;'>Consensus Automata</h4>
@@ -407,7 +343,6 @@ with st.sidebar:
 
     st.markdown("### 🛠️ Verification Controls")
 
-    # 4. Interactive Multiselect for model activations
     selected_models = st.multiselect(
         "Active Engine Classifiers",
         options=["Logistic Regression", "Random Forest", "MLP Neural Net", "K-Nearest Neighbors"],
@@ -415,7 +350,6 @@ with st.sidebar:
         help="Select which machine learning models are included in the consensus vote."
     )
 
-    # 5. Consensus Confidence Action Threshold Slider
     consensus_threshold = st.slider(
         "Consensus Action Threshold",
         min_value=50,
@@ -426,7 +360,6 @@ with st.sidebar:
         help="Minimum credibility score required to label an article as Likely Trustworthy."
     )
 
-    # 6. Styled Live Telemetry Web Fact-Check Toggle
     realtime_enabled = st.checkbox(
         "Always Run Web Fact-Check",
         value=False,
@@ -435,15 +368,12 @@ with st.sidebar:
     
     st.markdown("<hr style='border-color: rgba(192, 213, 214, 0.15); margin: 1.5rem 0;'>", unsafe_allow_html=True)
     
-    # 7. Dynamic Metrics Section (System Status Footprint)
     st.markdown("#### ⚡ System Status Monitoring")
     metric_col1, metric_col2 = st.columns(2)
     with metric_col1:
         st.metric(label="Ingested Feeds", value="44,898", delta="+12 today")
     with metric_col2:
         st.metric(label="API Latency", value="42 ms", delta="-3 ms")
-
-
 
 # Main Navigation Title
 st.markdown("""
@@ -454,7 +384,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# 3. Dynamic Side-by-Side Application Layout Grid
+# Layout Grid
 col_workspace, col_diagnostics = st.columns([1.3, 1.3], gap="large")
 
 with col_workspace:
@@ -462,13 +392,15 @@ with col_workspace:
     st.markdown("## 🌐 Analysis Workspace")
     st.markdown("<p class='workspace-desc'>Ingest real-time text streams or remote article URLs directly into the audit pipelines.</p>", unsafe_allow_html=True)
     
-    # Visual Anchors Inside Workspace Tabs
-    input_tab1, input_tab2, input_tab3, input_tab4 = st.tabs(["✍️ Manual Text Input", "🌐 Real-Time URL Fetcher", "🔄 Incremental Training", "🧠 Self-Learning & Drift"])
+    # Visual Anchors Inside Workspace Tabs - Stateful implementation
+    input_tab1, input_tab2, input_tab3, input_tab4 = st.tabs(
+        ["✍️ Manual Text Input", "🌐 Real-Time URL Fetcher", "🔄 Incremental Training", "🧠 Self-Learning & Drift"],
+        key="workspace_active_tabs"
+    )
     
     with input_tab1:
         st.image("assets/manual_text_input.png", caption="Textual Stream Ingestion Interface", use_container_width=True)
         
-        # Two-way data binding with session state to prevent sync bugs
         article_text = st.text_area(
             "Paste Raw Stream",
             key="article_text",
@@ -495,21 +427,55 @@ with col_workspace:
         if st.button("Execute Stream Web Crawler", use_container_width=True) and news_url.strip():
             with st.spinner("Connecting to host node..."):
                 result = scrape_article(news_url.strip())
-                st.session_state["article_text"] = f"CAPTURED STREAM: {result['title']}\n\n{result['text']}"
-                st.rerun()
+                if "error" in result:
+                    st.error(result["error"])
+                else:
+                    st.session_state["article_text"] = f"CAPTURED STREAM: {result['title']}\n\n{result['text']}"
+                    st.rerun()
                 
     with input_tab3:
-        st.image("assets/incremental_training.png", caption="Iterative Continuous Learning Node", use_container_width=True)
-        st.markdown("<p style='font-size:0.85rem; color:#C0D5D6;'>Train the active model space incrementally below by enforcing adjustments:</p>", unsafe_allow_html=True)
-        st.selectbox("True Verified Parameter Target", ["Authentic Data Vector", "Unverified Misinformation Signal"])
+        st.image("https://images.unsplash.com/photo-1639762681485-074b7f938ba0?auto=format&fit=crop&w=800&q=80", use_container_width=True)
+        st.markdown("<p style='font-size:0.85rem; color:#C0D5D6;'>Train the active model space incrementally by reinforcing target patterns:</p>", unsafe_allow_html=True)
         
-        if st.button("Submit Pattern Correction Matrix", use_container_width=True):
-            st.toast("Model gradients adjusted smoothly via online SGD backstep.", icon="🔄")
+        feedback_label = st.selectbox("Assign Verified Ground-Truth Label", ["Real News", "Fake News"], key="feedback_label_select")
+        submit_feedback = st.button("Deploy Dynamic Update Step", use_container_width=True)
+        
+        if submit_feedback:
+            if not st.session_state["article_text"].strip():
+                st.warning("Please populate text inside the workspace buffer to run adaptive training cycles.")
+            else:
+                # Prepare data tokens
+                text_to_train = st.session_state["article_text"]
+                clean_train = full_preprocess_pipeline(text_to_train)
+                
+                # Extract current feature vector layers (yielding 5,004 features)
+                vec_text = assets["vectorizer"].transform([clean_train])
+                t_chars = max(1, len(text_to_train))
+                t_words = max(1, len(text_to_train.split()))
+                
+                c_rat = sum(1 for c in text_to_train if c.isupper()) / t_chars
+                p_den = sum(1 for c in text_to_train if c in ['!', '?']) / t_chars
+                a_len = np.mean([len(w) for w in text_to_train.split()]) if text_to_train.split() else 0.0
+                s_bias = sum(1 for w in clean_train.split() if w in EMOTIONAL_WORDS) / t_words
+                
+                dense_feats = np.array([[c_rat, p_den, a_len, s_bias]], dtype=np.float64)
+                final_train_vector = sp.hstack([vec_text, sp.csr_matrix(dense_feats)])
+                
+                target_y = np.array([1]) if feedback_label == "Real News" else np.array([0])
+                
+                if hasattr(assets["logreg"], "partial_fit"):
+                    assets["logreg"].partial_fit(final_train_vector, target_y)
+                    
+                    with open("models/logreg_model.pkl", "wb") as f:
+                        pickle.dump(assets["logreg"], f)
+                        
+                    st.toast(f"Automata adjusted successfully! Reinforced as: {feedback_label}", icon="🔄")
+                else:
+                    st.error("The current model asset configuration does not support streaming incremental update loops.")
 
     with input_tab4:
         st.markdown("### 🧠 Continuous Active Learning Engine")
         
-        # Load drift reviews
         drift_file = "data/drift_review.json"
         drift_records = []
         if os.path.exists(drift_file):
@@ -532,7 +498,6 @@ with col_workspace:
                     if assets.get("logreg"):
                         from src.scripts.autonomous_engine import extract_hybrid_features, MODEL_PATH
                         model = assets["logreg"]
-                        # Ensure shape expansion compatibility
                         x_sparse = extract_hybrid_features(latest.get('text', ''), assets["vectorizer"])
                         model.partial_fit(x_sparse, np.array([1]), classes=np.array([0, 1]))
                         with open(MODEL_PATH, "wb") as f:
@@ -568,207 +533,134 @@ with col_diagnostics:
     st.markdown("<p class='workspace-desc'>Consensus telemetry metrics calculated cross-referencing all running models.</p>", unsafe_allow_html=True)
     
     if analyze_btn and st.session_state["article_text"].strip():
-        # Loading Screen Skeleton Emulation
         loader = st.empty()
         with loader.container():
             st.markdown("""
                 <div style='background: linear-gradient(90deg, rgba(8,58,79,0.3) 25%, rgba(64,126,140,0.5) 50%, rgba(8,58,79,0.3) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite linear; border-radius: 16px; height: 280px; width: 100%;'></div>
             """, unsafe_allow_html=True)
-            time.sleep(0.7)
-        loader.empty()
-        
+            
         cleaned_text = full_preprocess_pipeline(st.session_state["article_text"])
         original_word_count = len(st.session_state["article_text"].split())
         cleaned_word_count = len(cleaned_text.split())
         
-        if not SIMULATION_MODE:
-            # 1. TF-IDF Ingestion
-            vectorizer = assets["vectorizer"]
-            vectorized_input = vectorizer.transform([cleaned_text])
-            
-            # 2. Extract Top Keyword Tokens
-            feature_names = np.array(vectorizer.get_feature_names_out())
-            row = vectorized_input.tocoo()
-            sorted_indices = np.argsort(row.data)[::-1]
-            top_tokens = [(feature_names[row.col[i]], row.data[i]) for i in sorted_indices[:5]]
-            
-            # 3. Model Scoring (Filtered by active sidebar controls)
-            model_configs = {
-                name: key for name, key in {
-                    "Logistic Regression": "logreg",
-                    "Random Forest": "random_forest",
-                    "MLP Neural Net": "neuralnet",
-                    "K-Nearest Neighbors": "knn"
-                }.items() if name in selected_models
-            }
-            
-            predictions_summary = []
-            for name, key in model_configs.items():
-                model = assets[key]
-                if not model: continue
-                
-                # Check expected feature count dynamically to handle 5000 vs 5004 dimensions
-                expected_features = getattr(model, "n_features_in_", None)
-                if expected_features is None and hasattr(model, "coef_") and model.coef_ is not None:
-                    expected_features = model.coef_.shape[1]
-                    
-                if expected_features == len(vectorizer.get_feature_names_out()) + 4:
-                    import scipy.sparse as sp
-                    raw_text = st.session_state["article_text"]
-                    
-                    if not raw_text:
-                        cap_ratio = 0.0
-                        punct_density = 0.0
-                        avg_word_len = 0.0
-                        sentiment_bias = 0.0
-                    else:
-                        letters_only = [c for c in raw_text if c.isalpha()]
-                        cap_ratio = (sum(1 for c in letters_only if c.isupper()) / len(letters_only)) if letters_only else 0.0
-                        excl_q_count = raw_text.count('!') + raw_text.count('?')
-                        punct_density = excl_q_count / len(raw_text)
-                        words = raw_text.split()
-                        avg_word_len = (sum(len(w) for w in words) / len(words)) if words else 0.0
-                        
-                        from src.scripts.autonomous_engine import compute_sentiment_bias
-                        sentiment_bias = compute_sentiment_bias(raw_text)
-                        
-                    dense_features = np.array([[cap_ratio, punct_density, avg_word_len, sentiment_bias]], dtype=np.float64)
-                    dense_sparse = sp.csr_matrix(dense_features)
-                    model_input = sp.hstack([vectorized_input, dense_sparse], format="csr")
-                else:
-                    model_input = vectorized_input
-                    
-                pred = model.predict(model_input)[0]
-                probs = model.predict_proba(model_input)[0]
-                predictions_summary.append((name, pred, probs[pred] * 100))
-                
-            total_votes = len(predictions_summary)
-            if total_votes > 0:
-                real_votes = sum(1 for _, pred, _ in predictions_summary if pred == 1)
-                consensus_percentage = (real_votes / total_votes * 100)
-                
-                # Make consensus index detailed (using average prediction confidence for higher granularity)
-                if consensus_percentage > 50:
-                    score = np.mean([conf for _, pred, conf in predictions_summary if pred == 1])
-                elif consensus_percentage < 50:
-                    score = 100 - np.mean([conf for _, pred, conf in predictions_summary if pred == 0])
-                else:
-                    score = 50.0
-            else:
-                consensus_percentage = 50.0
-                score = 50.0
-                
-            sensational_words = ["killed", "assassinated", "assassination", "dead", "death", "arrested", "clones", "conspiracy", "secret", "escape"]
-            has_sensational = any(word in st.session_state["article_text"].lower() for word in sensational_words)
-            
-            realtime_results = []
-            search_query = ""
-            if realtime_enabled or has_sensational or (score == 50.0):
-                realtime_results, search_query = check_realtime_sources(st.session_state["article_text"])
-                
-            final_score = calculate_hybrid_score(score, realtime_results, st.session_state["article_text"])
-            
-            # Analyze AI-generated writing style parameters
-            ai_prob, cliche_count, variance = analyze_ai_writing_style(st.session_state["article_text"])
-            
-            # Apply additional penalty for high probability AI text with zero web confirmation
-            if ai_prob > 0.5 and (not realtime_results or len(realtime_results) == 0):
-                final_score = max(5.0, final_score - 15.0)
-            
-            if final_score > 50:
-                status_text = "CONSENSUS AUTHENTIC"
-                badge_color = "#407E8C"
-            elif final_score < 50:
-                status_text = "UNVERIFIED SIGNAL"
-                badge_color = "#A58D66"
-            else:
-                if realtime_results:
-                    verdict, color = analyze_realtime_verdict(realtime_results)
-                    status_text = f"TIE RESOLVED: {verdict}"
-                    badge_color = color
-                else:
-                    status_text = "INCONCLUSIVE / TIE"
-                    badge_color = "#64748B"
-        else:
-            # Simulation Mode Fallback logic
-            is_fake = "shocking" in st.session_state["article_text"].lower() or "china" in st.session_state["article_text"].lower()
-            score = 14.5 if is_fake else 89.65
-            final_score = score
-            ai_prob = 0.85 if is_fake else 0.12
-            status_text = "UNVERIFIED SIGNAL" if is_fake else "CONSENSUS AUTHENTIC"
-            badge_color = "#A58D66" if is_fake else "#407E8C"
-            predictions_summary = [
-                ("Logistic Regression", 0 if is_fake else 1, 89.2 if is_fake else 91.4),
-                ("Random Forest", 0 if is_fake else 1, 78.5 if is_fake else 84.0),
-                ("MLP Neural Net", 0 if is_fake else 1, 94.1 if is_fake else 95.8)
-            ]
-            top_tokens = [("shocking", 0.81), ("conspiracy", 0.74), ("clones", 0.69)] if is_fake else [("washington", 0.58), ("consistent", 0.52), ("manufacturing", 0.44)]
-
-        # Determine AI style label color
-        ai_label = "Low (Human Writer)"
-        ai_color = "#407E8C"
-        if ai_prob > 0.6:
-            ai_label = "High Probability AI"
-            ai_color = "#A58D66"
-        elif ai_prob > 0.3:
-            ai_label = "Moderate AI Signature"
-            ai_color = "#64748B"
-
-        real_percentage = final_score
-        fake_percentage = 100.0 - real_percentage
+        loader.empty()
         
-        if status_text.startswith("TIE RESOLVED:"):
-            verdict_label = status_text
-            verdict_class = f"background: {badge_color}33; border-color: {badge_color}; color: #E5E1DD;"
-        elif real_percentage >= consensus_threshold:
-            verdict_label = "LIKELY TRUSTWORTHY"
-            verdict_class = "background: rgba(64, 126, 140, 0.25); border-color: #407E8C; color: #C0D5D6;"
+        # 1. TF-IDF Ingestion
+        vectorizer = assets["vectorizer"]
+        vectorized_input = vectorizer.transform([cleaned_text]) # 5,000 features
+        
+        # Extract Top Keyword Tokens
+        feature_names = np.array(vectorizer.get_feature_names_out())
+        row = vectorized_input.tocoo()
+        sorted_indices = np.argsort(row.data)[::-1]
+        top_tokens = [(feature_names[row.col[i]], row.data[i]) for i in sorted_indices[:5]]
+        
+        # Calculate the 4 custom dense engineering features
+        raw_text = st.session_state["article_text"]
+        raw_chars = max(1, len(raw_text))
+        raw_words = max(1, len(raw_text.split()))
+        
+        cap_ratio = sum(1 for c in raw_text if c.isupper()) / raw_chars
+        punc_density = sum(1 for c in raw_text if c in ['!', '?']) / raw_chars
+        avg_word_len = np.mean([len(w) for w in raw_text.split()]) if raw_text.split() else 0.0
+        sentiment_bias = sum(1 for w in cleaned_text.split() if w in EMOTIONAL_WORDS) / raw_words
+        
+        # Combine into the exact 5,004 dimensional feature shape expected by the models
+        dense_meta = np.array([[cap_ratio, punc_density, avg_word_len, sentiment_bias]], dtype=np.float64)
+        final_input = sp.hstack([vectorized_input, sp.csr_matrix(dense_meta)])
+        
+        # Loop through each trained classifier to compile actual real-time predictions
+        predictions_summary = []
+        model_keys = []
+        for name, key in {
+            "Logistic Regression": "logreg",
+            "Random Forest": "random_forest",
+            "MLP Neural Net": "neuralnet",
+            "K-Nearest Neighbors": "knn"
+        }.items():
+            if name in selected_models:
+                model_keys.append(key)
+                
+        model_labels = {
+            "logreg": "Online Logic Engine",
+            "random_forest": "Random Forest Automata",
+            "neuralnet": "Neural Network Array",
+            "knn": "K-Nearest Neighbors"
+        }
+        
+        for key in model_keys:
+            active_model = assets.get(key)
+            if active_model is not None:
+                pred = active_model.predict(final_input)[0]
+                probs = active_model.predict_proba(final_input)[0]
+                confidence = probs[pred] * 100
+                predictions_summary.append((model_labels[key], pred, confidence, probs[1] * 100))
+        
+        # Compute exact consensus across running models
+        if predictions_summary:
+            real_scores = [item[3] for item in predictions_summary]
+            score = np.mean(real_scores)
         else:
-            verdict_label = "HIGH RISK / UNVERIFIED"
-            verdict_class = "background: rgba(165, 141, 102, 0.25); border-color: #A58D66; color: #E5E1DD;"
+            score = 50.0
+            
+        sensational_words = ["killed", "assassinated", "assassination", "dead", "death", "arrested", "clones", "conspiracy", "secret", "escape"]
+        has_sensational = any(word in raw_text.lower() for word in sensational_words)
+        
+        realtime_results = []
+        search_query = ""
+        if realtime_enabled or has_sensational or (score == 50.0):
+            realtime_results, search_query = check_realtime_sources(raw_text)
+            
+        final_score = calculate_hybrid_score(score, realtime_results, raw_text)
+        
+        # Analyze AI-generated writing style parameters
+        ai_prob, cliche_count, variance = analyze_ai_writing_style(raw_text)
+        
+        # Apply additional penalty for high probability AI text with zero web confirmation
+        if ai_prob > 0.5 and (not realtime_results or len(realtime_results) == 0):
+            final_score = max(5.0, final_score - 15.0)
+            
+        real_score = final_score
+        fake_score = 100.0 - real_score
 
-        # 2. Main Public-Facing Gauge Component (Dual Split Bar)
+        # Render Consolidated UI Gauge
+        verdict_msg = "HIGH RISK MISINFORMATION" if fake_score >= 50.0 else "VERIFIED AUTHENTIC CONTEXT"
+        verdict_badge = "#A58D66" if fake_score >= 50.0 else "#407E8C"
+        
         st.markdown(f"""
-<div style='background: rgba(2, 13, 20, 0.5); border: 1px solid rgba(192, 213, 214, 0.1); border-radius: 20px; padding: 2rem; text-align: center; margin-bottom: 2rem;'>
-<span style='font-size: 0.75rem; text-transform: uppercase; tracking-letter: 0.05em; color: #C0D5D6; font-weight: 600; display: block; margin-bottom: 0.5rem;'>Credibility Distribution Index</span>
-<div style='display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem; padding: 0 5px;'>
-<span style='font-size: 2.2rem; font-weight: 800; color: #407E8C; font-family: Outfit;'>Real: {real_percentage:.1f}%</span>
-<span style='font-size: 2.2rem; font-weight: 800; color: #A58D66; font-family: Outfit;'>Fake: {fake_percentage:.1f}%</span>
-</div>
-<div style='width: 100%; height: 16px; background-color: rgba(255,255,255,0.05); border-radius: 99px; display: flex; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 1.5rem;'>
-<div style='width: {real_percentage}%; background: linear-gradient(90deg, #083A4F, #407E8C); transition: width 0.5s ease;'></div>
-<div style='width: {fake_percentage}%; background: linear-gradient(90deg, #A58D66, #e5e1dd22); transition: width 0.5s ease;'></div>
-</div>
-<div style='margin-bottom: 1.25rem;'>
-<span style='padding: 0.5rem 1.5rem; border-radius: 50px; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.02em; border: 1px solid; {verdict_class}'>
-📢 Final Assessment: {verdict_label}
-</span>
-</div>
-<div style='font-size: 0.75rem; color: #C0D5D6; margin-top: 0.75rem;'>
-ML Vocab Consensus: {score:.1f}% | AI Writing Likelihood: <span style='color: {ai_color}; font-weight:700;'>{ai_prob*100:.0f}% ({ai_label})</span>
-</div>
-</div>
-""", unsafe_allow_html=True)
-        
-        # 3. Clean UI Breakdown Section
-        st.markdown("<h4 style='font-size:1.05rem; color:#C0D5D6; font-weight:700; margin-bottom:1rem; letter-spacing:0.02em;'>AI Model Analysis Breakdown</h4>", unsafe_allow_html=True)
-        
+        <div style='background: rgba(2, 13, 20, 0.5); border: 1px solid rgba(192,213,214,0.1); border-radius:20px; padding:1.5rem; text-align:center; margin-bottom:1.5rem;'>
+            <span style='font-size:0.75rem; text-transform:uppercase; color:#C0D5D6; font-weight:600;'>Linguistic Credibility Distribution</span>
+            <div style='display:flex; justify-content:space-between; margin: 0.5rem 0; font-family:Outfit; font-weight:800; font-size:2rem;'>
+                <span style='color:#407E8C;'>Real: {real_score:.1f}%</span>
+                <span style='color:#A58D66;'>Fake: {fake_score:.1f}%</span>
+            </div>
+            <div style='width:100%; height:12px; background:rgba(255,255,255,0.05); border-radius:20px; display:flex; overflow:hidden; margin-bottom:1.2rem;'>
+                <div style='width:{real_score}%; background:linear-gradient(90deg, #083A4F, #407E8C);'></div>
+                <div style='width:{fake_score}%; background:linear-gradient(90deg, #A58D66, #E5E1DD);'></div>
+            </div>
+            <span style='background:{verdict_badge}; color:#E5E1DD; padding:0.4rem 1.2rem; border-radius:50px; font-weight:700; font-size:0.8rem;'>📢 System Verdict: {verdict_msg}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Dynamic Grid rendering of actual computed model weights
+        st.markdown("<div class='model-card-grid'>", unsafe_allow_html=True)
         if len(predictions_summary) > 0:
             m_cols = st.columns(len(predictions_summary))
-            for idx, (name, pred, conf) in enumerate(predictions_summary):
+            for idx, (name, pred, conf, _) in enumerate(predictions_summary):
                 with m_cols[idx]:
                     lbl = "Real" if pred == 1 else "Fake"
                     color = "#407E8C" if pred == 1 else "#A58D66"
                     bg = "rgba(64,126,140,0.1)" if pred == 1 else "rgba(165,141,102,0.1)"
                     st.markdown(f"""
-                        <div style='background: rgba(2, 13, 20, 0.4); border: 1px solid rgba(192, 213, 214, 0.08); padding: 1.2rem 0.5rem; border-radius: 16px; text-align: center; height: 100%;'>
-                            <div style='font-size: 0.75rem; color: #C0D5D6; font-weight: 500; margin-bottom: 0.6rem; min-height: 32px; display: flex; align-items: center; justify-content: center;'>{name}</div>
-                            <span style='background: {bg}; border: 1px solid {color}; color: {color}; font-size: 0.7rem; padding: 0.25rem 0.75rem; border-radius: 8px; font-weight: 700; text-transform: uppercase;'>{lbl}</span>
-                            <div style='font-size: 0.85rem; color: #E5E1DD; font-weight: 600; margin-top: 0.6rem;'>{conf:.1f}% Certainty</div>
-                        </div>
+                    <div style='background: rgba(2, 13, 20, 0.4); border: 1px solid rgba(192, 213, 214, 0.08); padding: 1.2rem 0.5rem; border-radius: 16px; text-align: center;'>
+                        <div style='font-size: 0.75rem; color: #C0D5D6; margin-bottom: 0.5rem;'>{name}</div>
+                        <span style='background: {bg}; border: 1px solid {color}; color: {color}; font-size: 0.7rem; padding: 0.25rem 0.75rem; border-radius: 8px; font-weight: 700; text-transform: uppercase;'>{lbl}</span>
+                        <div style='font-size: 0.85rem; color: #E5E1DD; font-weight: 600; margin-top: 0.5rem;'>{conf:.1f}% Certainty</div>
+                    </div>
                     """, unsafe_allow_html=True)
         else:
             st.warning("No classifier models loaded successfully.")
+        st.markdown("</div>", unsafe_allow_html=True)
                 
         # Telemetry & Diagnostic details
         st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
@@ -803,7 +695,7 @@ ML Vocab Consensus: {score:.1f}% | AI Writing Likelihood: <span style='color: {a
                 """, unsafe_allow_html=True)
             
     else:
-        # High Quality Central Dashboard Graphic Vector Placeholder
+        # Dashboard Graphic Vector Placeholder
         st.image("assets/idle_placeholder.png", caption="Auditing Array Idle Status Matrix", use_container_width=True)
         st.markdown("""
         <div style='text-align: center; color: #C0D5D6; font-size: 0.85rem; padding: 1rem 0;'>

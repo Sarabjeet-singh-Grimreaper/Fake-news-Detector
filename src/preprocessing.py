@@ -72,9 +72,31 @@ def tokenize_and_filter(text):
     return " ".join([word for word in words if word and word not in STOPWORDS])
 
 def full_preprocess_pipeline(text):
-    """
-    The master function that runs both steps back-to-back.
-    """
-    cleaned_string = clean_text(text)
-    final_output = tokenize_and_filter(cleaned_string)
-    return final_output
+    if not text or not isinstance(text, str):
+        return ""
+    
+    # 1. Lowercase target string stream
+    text = text.lower()
+    
+    # 2. Strip Global Publisher Leakage & Datelines
+    # Removes patterns like "london (reuters) - ", "tokyo (ap) - ", etc.
+    text = re.sub(r'^[a-z\s\.,\-_\|]+(\(reuters\)[^\-]*\-|\(ap\)[^\-]*\-)', '', text)
+    text = re.sub(r'\b(reuters|ap|bbc|cnn|foxnews|truthunleashed)\b', '', text)
+    text = re.sub(r'\bread more via\b.*$', '', text)
+    
+    # 3. Strip URL patterns and email entities
+    text = re.sub(r'https?://\S+|www\.\S+', '', text)
+    text = re.sub(r'\S+@\S+', '', text)
+    
+    # 4. Extract word tokens between 3 and 15 alphabetic characters
+    words = re.findall(r'\b[a-z]{3,15}\b', text)
+    
+    # 5. Native Optimized Academic Stopwords List
+    stopwords = {
+        "the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "to", "of", 
+        "in", "for", "on", "with", "at", "by", "from", "this", "that", "these", "those",
+        "it", "its", "they", "them", "their", "which", "who", "whom", "here", "there"
+    }
+    
+    cleaned_tokens = [w for w in words if w not in stopwords]
+    return " ".join(cleaned_tokens)
