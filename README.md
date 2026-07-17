@@ -113,17 +113,28 @@ python run_pipeline.py --test
 
 ---
 
-## 🧪 Real-time Interfaces (Frontend & Ingestion Stream)
+## 🧪 Interactive Live Interfaces
 
-### 1. Interactive Custom Portal (Streamlit)
-To launch the modern dark-themed interactive SaaS verification portal in your browser:
-```powershell
-streamlit run app.py
-```
-This application allows you to paste any news article, scrape URL contents, and cross-evaluate authenticity verdicts dynamically with optimized visual controls.
+### 🎨 1. Interactive Information Flow Simulator (GitHub Pages)
+A mobile-optimized, high-performance HTML5 Canvas simulation designed to model information propagation, particle physics collisions, and news classification.
+* **Live Site:** [sarabjeet-singh-grimreaper.github.io/Fake-news-Detector](https://Sarabjeet-singh-Grimreaper.github.io/Fake-news-Detector/)
+* **Key Enhancements:**
+  * **Retina/High-DPI Sharpness:** Accounts for `window.devicePixelRatio` to prevent blurriness on iPhones, tablets, and high-DPI desktop screens.
+  * **Cross-Platform Responsiveness:** Auto-scales viewport and adjusts coordinates dynamically on window resize or rotation.
+  * **Touch Optimizations:** Combines unified modern `PointerEvents` and applies `touch-action: none;` to suppress system gesture collisions (pinch-to-zoom, page-bounce).
+  * **Action Workflow Deployment:** Auto-deploys static elements recursively through [.github/workflows/deploy.yml](.github/workflows/deploy.yml).
 
-### 2. Auto-Refreshing RSS Feed Classifier (Flask)
-To start the live Google News RSS feed monitoring dashboard (evaluating new global headlines every 10 seconds):
+### 🛡️ 2. Custom Classification Portal (Streamlit)
+To interact with our trained machine learning models, enter custom article texts, or parse live URLs:
+* **Live App Portal:** [fake-news-detector-sarabjeet2448060.streamlit.app](https://fake-news-detector-sarabjeet2448060.streamlit.app/)
+* **To Run Locally:**
+  ```powershell
+  streamlit run app.py
+  ```
+  *(Or execute `.\run.bat` which handles setup, virtual environment, and launches the app automatically).*
+
+### 📰 3. Auto-Refreshing RSS Feed Classifier (Flask)
+To start the live Google News RSS feed monitoring dashboard (evaluating new global headlines every 10 seconds) on your machine:
 ```powershell
 python src/realtime_dashboard.py
 ```
