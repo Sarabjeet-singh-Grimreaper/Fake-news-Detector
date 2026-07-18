@@ -32,18 +32,49 @@ def verify_detector():
         "Online SGD Classifier": "sgd_online"
     }
     
+    import scipy.sparse as sp
+    import numpy as np
+    EMOTIONAL_WORDS = {'shocking', 'conspiracy', 'leaked', 'secret', 'urgent', 'viral', 'breaking', 'exposed', 'unbelievable', 'miracle', 'truth', 'warning', 'agenda', 'censored', 'anonymous', 'classified', 'insider', 'hiding', 'scandal', 'banned', 'shocked', 'chaos', 'destroys', 'slam', 'blasts', 'panic', 'terror', 'crisis', 'must-see', 'revealed', 'prophecy', 'secretly'}
+
     # Run predictions
     for sample_name, sample in [("Real News Sample", real_sample), ("Fake News Sample", fake_sample)]:
         print(f"\n==================== PREDICTIONS FOR: {sample_name} ====================")
-        cleaned = full_preprocess_pipeline(sample['text'])
+        text_raw = str(sample['text'])
+        cleaned = full_preprocess_pipeline(text_raw)
         vectorized = vectorizer.transform([cleaned])
+        
+        t_chars = max(1, len(text_raw))
+        words_list = text_raw.split()
+        t_words = max(1, len(words_list))
+        
+        c_rat = sum(1 for c in text_raw if c.isupper()) / t_chars
+        p_den = sum(1 for c in text_raw if c in ['!', '?']) / t_chars
+        avg_word_len = np.mean([len(w) for w in words_list]) if words_list else 0.0
+        sentiment_bias = sum(1 for w in cleaned.split() if w in EMOTIONAL_WORDS) / t_words
+        
+        dense_feats = np.array([[c_rat, p_den, avg_word_len, sentiment_bias]], dtype=np.float64)
+        final_vector = sp.hstack([vectorized, sp.csr_matrix(dense_feats)])
         
         for model_name, file_key in models.items():
             try:
-                with open(f"models/{file_key}_model.pkl", "rb") as f:
+                # Resolve sgd_online to sgd_online_model
+                filename = f"models/sgd_online_model.pkl" if file_key == "sgd_online" else f"models/{file_key}_model.pkl"
+                with open(filename, "rb") as f:
                     model = pickle.load(f)
-                pred = model.predict(vectorized)[0]
-                probs = model.predict_proba(vectorized)[0]
+                
+                # Align dimensionality dynamically if needed
+                current_vector = final_vector
+                if hasattr(model, "n_features_in_"):
+                    expected = model.n_features_in_
+                    actual = current_vector.shape[1]
+                    if actual > expected:
+                        current_vector = current_vector[:, :expected]
+                    elif actual < expected:
+                        padding = sp.csr_matrix((current_vector.shape[0], expected - actual))
+                        current_vector = sp.hstack([current_vector, padding], format="csr")
+
+                pred = model.predict(current_vector)[0]
+                probs = model.predict_proba(current_vector)[0]
                 
                 verdict = "Real (1)" if pred == 1 else "Fake (0)"
                 confidence = probs[pred] * 100

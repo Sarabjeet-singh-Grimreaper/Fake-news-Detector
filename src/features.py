@@ -7,7 +7,14 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 
 # Simple local emotional keywords for sentiment bias calculation
-EMOTIONAL_WORDS = {'shocking', 'conspiracy', 'leaked', 'secret', 'urgent', 'viral'}
+EMOTIONAL_WORDS = {
+    'shocking', 'conspiracy', 'leaked', 'secret', 'urgent', 'viral', 'breaking', 
+    'exposed', 'unbelievable', 'miracle', 'truth', 'warning', 'agenda', 'censored', 
+    'anonymous', 'classified', 'insider', 'hiding', 'scandal', 'banned', 'shocked', 
+    'chaos', 'destroys', 'slam', 'blasts', 'panic', 'terror', 'crisis', 'must-see', 
+    'revealed', 'prophecy', 'secretly', 'unconfirmed', 'hoax', 'fraud', 'illegal',
+    'conspire', 'collusion', 'deepstate', 'rigged', 'covert', 'plot', 'cover-up'
+}
 
 def extract_features():
     processed_path = "data/processed/combined_news.csv"

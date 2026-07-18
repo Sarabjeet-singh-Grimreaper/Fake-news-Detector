@@ -24,7 +24,14 @@ st.set_page_config(
 SIMULATION_MODE = False
 
 # Simple local emotional keywords for sentiment bias calculation
-EMOTIONAL_WORDS = {'shocking', 'conspiracy', 'leaked', 'secret', 'urgent', 'viral'}
+EMOTIONAL_WORDS = {
+    'shocking', 'conspiracy', 'leaked', 'secret', 'urgent', 'viral', 'breaking', 
+    'exposed', 'unbelievable', 'miracle', 'truth', 'warning', 'agenda', 'censored', 
+    'anonymous', 'classified', 'insider', 'hiding', 'scandal', 'banned', 'shocked', 
+    'chaos', 'destroys', 'slam', 'blasts', 'panic', 'terror', 'crisis', 'must-see', 
+    'revealed', 'prophecy', 'secretly', 'unconfirmed', 'hoax', 'fraud', 'illegal',
+    'conspire', 'collusion', 'deepstate', 'rigged', 'covert', 'plot', 'cover-up'
+}
 
 def check_realtime_sources(text):
     import requests
