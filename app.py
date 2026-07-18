@@ -279,8 +279,18 @@ def load_assets():
     models = ["knn", "logreg", "random_forest", "neuralnet"]
     for m in models:
         try:
-            with open(f"models/{m}_model.pkl", "rb") as f:
-                assets[m] = pickle.load(f)
+            filename = f"models/{m}_model.pkl"
+            if m == "logreg":
+                with open(filename, "rb") as f:
+                    obj = pickle.load(f)
+                if not hasattr(obj, "partial_fit"):
+                    # Fallback to the online logistic regression version
+                    with open("models/sgd_online_model.pkl", "rb") as f:
+                        obj = pickle.load(f)
+                assets[m] = obj
+            else:
+                with open(filename, "rb") as f:
+                    assets[m] = pickle.load(f)
         except Exception:
             assets[m] = None
     return assets
