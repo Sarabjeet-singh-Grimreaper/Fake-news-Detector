@@ -341,6 +341,13 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+    st.markdown("### 🧭 Workspace Selection")
+    workspace_mode = st.selectbox(
+        "Workspace Mode",
+        options=["📊 Public Diagnostic Portal", "🔐 Secure Admin Console"],
+        key="workspace_mode"
+    )
+
     st.markdown("### 🛠️ Verification Controls")
 
     selected_models = st.multiselect(
@@ -374,6 +381,101 @@ with st.sidebar:
         st.metric(label="Ingested Feeds", value="44,898", delta="+12 today")
     with metric_col2:
         st.metric(label="API Latency", value="42 ms", delta="-3 ms")
+
+# Handle Secure Admin Console view
+if workspace_mode == "🔐 Secure Admin Console":
+    st.markdown("""
+    <div style='text-align: center; padding: 2.5rem 0 1.5rem 0;'>
+        <div style='display: inline-flex; background: rgba(165, 141, 102, 0.15); border: 1px solid #A58D66; color: #A58D66; padding: 0.4rem 1.2rem; border-radius: 100px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 1rem;'>🔐 Restricted Access</div>
+        <h1 class='hero-title'>SECURE ADMIN CONSOLE</h1>
+        <p style='color: #C0D5D6; max-width: 700px; margin: 0 auto; font-size: 1.05rem;'>Protected administrative interface for incremental gradient updates and active parameter optimization.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="premium-card"></div>', unsafe_allow_html=True)
+    
+    password = st.text_input("Enter Admin Authorization Key", type="password", key="admin_auth_key")
+    
+    if password == "VerifIQ_Admin_2026":
+        st.success("Authorization successful. Active learning controls unlocked.")
+        
+        admin_text = st.text_area(
+            "Administrative Real News Input Stream",
+            height=220,
+            placeholder="Paste verified real news text block here to update model parameters..."
+        )
+        
+        btn_update = st.button("Deploy Gradient Update Step", use_container_width=True)
+        
+        if btn_update:
+            if not admin_text.strip():
+                st.warning("Please populate the text input before deploying gradient update.")
+            else:
+                try:
+                    with st.spinner("Executing pipeline and optimizing weights..."):
+                        # Preprocess text
+                        cleaned_text = full_preprocess_pipeline(admin_text)
+                        
+                        if assets.get("vectorizer") is None:
+                            st.error("Global TfidfVectorizer is not loaded.")
+                        else:
+                            # Vectorize text (5,000 features)
+                            vec_text = assets["vectorizer"].transform([cleaned_text])
+                            
+                            # Dense structural features
+                            t_chars = max(1, len(admin_text))
+                            words = admin_text.split()
+                            t_words = max(1, len(words))
+                            
+                            c_rat = sum(1 for c in admin_text if c.isupper()) / t_chars
+                            p_den = sum(1 for c in admin_text if c in ['!', '?']) / t_chars
+                            a_len = np.mean([len(w) for w in words]) if words else 0.0
+                            s_bias = sum(1 for w in cleaned_text.split() if w in EMOTIONAL_WORDS) / t_words
+                            
+                            dense_feats = np.array([[c_rat, p_den, a_len, s_bias]], dtype=np.float64)
+                            
+                            # scipy.sparse.hstack to bind features to 5004 dimensions
+                            final_train_vector = sp.hstack([vec_text, sp.csr_matrix(dense_feats)])
+                            
+                            # Ensure 5004 features
+                            actual_dim = final_train_vector.shape[1]
+                            if actual_dim != 5004:
+                                st.warning(f"Feature vector dimension is {actual_dim} instead of 5,004. Attempting auto-alignment.")
+                                if actual_dim > 5004:
+                                    final_train_vector = final_train_vector[:, :5004]
+                                else:
+                                    padding = sp.csr_matrix((1, 5004 - actual_dim))
+                                    final_train_vector = sp.hstack([final_train_vector, padding], format="csr")
+                            
+                            # Target array label 1
+                            target_y = np.array([1])
+                            
+                            # Parameter update
+                            logreg = assets.get("logreg")
+                            if logreg is not None and hasattr(logreg, "partial_fit"):
+                                logreg.partial_fit(final_train_vector, target_y)
+                                
+                                # Save back to models/logreg_model.pkl
+                                with open("models/logreg_model.pkl", "wb") as f:
+                                    pickle.dump(logreg, f)
+                                
+                                st.toast("Online gradient update completed! Target weights saved.", icon="🔐")
+                                st.success("Parameter optimization step successful. Updated logreg model saved on disk.")
+                            else:
+                                st.error("Loaded Logistic Regression model is not available or does not support partial_fit().")
+                except Exception as e:
+                    st.error(f"Execution Error: {str(e)}")
+    elif password != "":
+        st.markdown("""
+        <div style='background: rgba(165, 141, 102, 0.2); border: 1px solid #A58D66; border-radius: 12px; padding: 1.5rem; text-align: center;'>
+            <h4 style='color: #A58D66; margin: 0;'>Access Denied</h4>
+            <p style='color: #C0D5D6; margin: 0.5rem 0 0 0; font-size: 0.9rem;'>The credentials provided do not match authorization records.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.info("System Locked: Credentials input required to expose administrative controls.")
+    st.stop()
+
 
 # Main Navigation Title
 st.markdown("""
