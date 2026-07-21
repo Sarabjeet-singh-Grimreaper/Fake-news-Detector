@@ -10,25 +10,25 @@ def get_models():
     """
     return {
         "KNN": KNeighborsClassifier(
-            n_neighbors=5,
+            n_neighbors=9,
             weights="distance",
             n_jobs=-1
         ),
         "LogReg": LogisticRegression(
-            C=1.0,
+            C=10.0,
             penalty="l2",
             max_iter=1000,
             random_state=42
         ),
         "Random Forest": RandomForestClassifier(
             n_estimators=100,
-            max_depth=30,
+            max_depth=None,
             random_state=42,
             n_jobs=-1
         ),
         "NeuralNet": MLPClassifier(
-            hidden_layer_sizes=(50,),
-            max_iter=100,
+            hidden_layer_sizes=(100,),
+            max_iter=200,
             alpha=0.0001,
             random_state=42
         ),

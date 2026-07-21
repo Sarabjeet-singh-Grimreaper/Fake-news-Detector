@@ -36,32 +36,59 @@ EMOTIONAL_WORDS = {
 def check_realtime_sources(text):
     import requests
     from bs4 import BeautifulSoup
+    import re
     
+    # 1. Primary query from the first line (general context)
     first_line = text.strip().split("\n")[0]
     words = first_line.split()
-    query = " ".join(words[:10]) if len(words) > 10 else first_line
+    primary_query = " ".join(words[:10]) if len(words) > 10 else first_line
     
-    url = "https://lite.duckduckgo.com/lite/"
-    data = {"q": query + " fact check"}
+    # 2. Identify potential high-risk or secondary sensational claims
+    # Find sentences in the text
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    claim_query = None
+    sensational_keywords = ["war", "nuclear", "kill", "attack", "arrest", "clones", "conspiracy", "secret", "inject", "poison"]
+    
+    for sent in reversed(sentences):
+        sent_clean = sent.strip()
+        if not sent_clean:
+            continue
+        # If a sentence contains conflict/sensational keywords, we verify it specifically
+        if any(word in sent_clean.lower() for word in sensational_keywords):
+            # Keep query size reasonable
+            s_words = sent_clean.split()
+            claim_query = " ".join(s_words[:12]) if len(s_words) > 12 else sent_clean
+            break
+            
+    queries = [primary_query]
+    if claim_query and claim_query not in primary_query:
+        queries.append(claim_query)
+        
+    results = []
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
     }
-    try:
-        r = requests.post(url, data=data, headers=headers, timeout=8)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, 'html.parser')
-        links = soup.find_all('a', class_='result-link')
-        snippets = soup.find_all('td', class_='result-snippet')
-        results = []
-        for l, s in zip(links[:3], snippets[:3]):
-            results.append({
-                "title": l.get_text().strip(),
-                "url": l['href'],
-                "snippet": s.get_text().strip()
-            })
-        return results, query
-    except Exception:
-        return [], query
+    
+    for q in queries:
+        url = "https://lite.duckduckgo.com/lite/"
+        data = {"q": q + " fact check"}
+        try:
+            r = requests.post(url, data=data, headers=headers, timeout=8)
+            r.raise_for_status()
+            soup = BeautifulSoup(r.text, 'html.parser')
+            links = soup.find_all('a', class_='result-link')
+            snippets = soup.find_all('td', class_='result-snippet')
+            for l, s in zip(links[:3], snippets[:3]):
+                results.append({
+                    "title": l.get_text().strip(),
+                    "url": l['href'],
+                    "snippet": s.get_text().strip(),
+                    "query_type": "primary" if q == primary_query else "claim"
+                })
+        except Exception:
+            pass
+            
+    return results, primary_query
 
 def analyze_realtime_verdict(results):
     fake_signals = ["hoax", "false", "debunk", "untrue", "misleading", "fake", "fabricat"]
@@ -93,33 +120,114 @@ def calculate_hybrid_score(ml_score, realtime_results, text):
     text_lower = text.lower()
     has_sensational = any(word in text_lower for word in sensational_words)
     
+    # Explicit fake indicators/misleading elements that suggest data poisoning or manual alteration
+    fake_indicators = ["hoax", "conspiracy", "rigged", "unbelievable", "leaked", "secretly", "fake news", "deception", "fabricated", "clones"]
+    fake_indicator_count = sum(text_lower.count(word) for word in fake_indicators)
+    
     fake_signals = ["hoax", "false", "debunk", "untrue", "misleading", "fake", "fabricat", "rumor", "conspiracy", "unconfirmed"]
     real_signals = ["true", "confirmed", "verified", "authentic", "official", "reuters", "associated press", "reported"]
     
     fake_hits = 0
     real_hits = 0
+    claim_fake_hits = 0
+    claim_real_hits = 0
+    has_claim_query = False
     
     if realtime_results:
         for r in realtime_results:
+            is_claim = r.get("query_type") == "claim"
+            if is_claim:
+                has_claim_query = True
             content = (r["title"] + " " + r["snippet"]).lower()
-            for word in fake_signals:
-                if word in content:
-                    fake_hits += 1
-            for word in real_signals:
-                if word in content:
-                    real_hits += 1
+            
+            # Count signals
+            f_count = sum(1 for word in fake_signals if word in content)
+            r_count = sum(1 for word in real_signals if word in content)
+            
+            if is_claim:
+                claim_fake_hits += f_count
+                claim_real_hits += r_count
+            else:
+                fake_hits += f_count
+                real_hits += r_count
                     
+        # Score primary results
         if fake_hits > real_hits:
-            penalty = min(50.0, 15.0 * (fake_hits - real_hits))
-            hybrid_score = max(5.0, ml_score - penalty)
+            penalty = min(40.0, 12.0 * (fake_hits - real_hits))
+            hybrid_score = max(5.0, hybrid_score - penalty)
         elif real_hits > fake_hits:
-            boost = min(20.0, 5.0 * (real_hits - fake_hits))
-            hybrid_score = min(98.0, ml_score + boost)
+            boost = min(15.0, 4.0 * (real_hits - fake_hits))
+            hybrid_score = min(98.0, hybrid_score + boost)
+            
+        # Score secondary claim results specifically
+        if has_claim_query:
+            if claim_fake_hits > claim_real_hits or claim_real_hits == 0:
+                # If the sensational claim has debunking signals or zero verified reports, heavily penalize it
+                hybrid_score = max(5.0, hybrid_score - 55.0)
     else:
         if has_sensational:
             hybrid_score = max(10.0, ml_score - 35.0)
             
+    # Apply direct penalty if explicit fake/misleading elements are injected to alter standard news
+    if fake_indicator_count >= 1:
+        penalty = min(55.0, 20.0 * fake_indicator_count)
+        hybrid_score = max(5.0, hybrid_score - penalty)
+            
     return hybrid_score
+
+def compare_with_real_news(user_text, real_news_text):
+    """
+    Compares the user's input text with the scraped text of the real news article.
+    Identifies sentences in user_text that do not exist or have very low similarity
+    with any sentences in real_news_text.
+    """
+    import re
+    from difflib import SequenceMatcher
+    
+    # Split both texts into sentences
+    user_sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', user_text) if s.strip()]
+    real_sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', real_news_text) if s.strip()]
+    
+    if not user_sentences or not real_sentences:
+        return [], 100.0
+        
+    altered_sentences = []
+    matched_count = 0
+    
+    for u_sent in user_sentences:
+        # Ignore extremely short phrases
+        if len(u_sent.split()) < 3:
+            continue
+            
+        best_ratio = 0.0
+        # Clean both for better matching
+        u_clean = re.sub(r'[^\w\s]', '', u_sent.lower()).strip()
+        if not u_clean:
+            continue
+            
+        for r_sent in real_sentences:
+            r_clean = re.sub(r'[^\w\s]', '', r_sent.lower()).strip()
+            if not r_clean:
+                continue
+            # Quick check if u_clean is a substring or vice versa
+            if u_clean in r_clean or r_clean in u_clean:
+                best_ratio = 1.0
+                break
+                
+            # Otherwise use SequenceMatcher
+            ratio = SequenceMatcher(None, u_clean, r_clean).ratio()
+            if ratio > best_ratio:
+                best_ratio = ratio
+                if best_ratio > 0.85:
+                    break
+                    
+        if best_ratio < 0.65: # Threshold below which sentence is considered altered/injected
+            altered_sentences.append(u_sent)
+        else:
+            matched_count += 1
+            
+    match_percentage = (matched_count / len(user_sentences)) * 100 if user_sentences else 0.0
+    return altered_sentences, match_percentage
 
 def analyze_ai_writing_style(text):
     ai_cliches = ["delve", "tapestry", "testament", "pivotal", "catalyst", "moreover", "furthermore", "important to note", "underscores", "beacon of", "demystify"]
@@ -752,6 +860,26 @@ with col_diagnostics:
         if ai_prob > 0.5 and (not realtime_results or len(realtime_results) == 0):
             final_score = max(5.0, final_score - 15.0)
             
+        # 2. Match original real news context to check for injected fake details
+        from src.scraper import scrape_article
+        real_article_scraped = None
+        altered_sentences = []
+        match_percentage = 100.0
+        
+        if realtime_results:
+            for r in realtime_results:
+                if r.get("query_type") != "claim":
+                    scraped_res = scrape_article(r["url"])
+                    if scraped_res and "error" not in scraped_res and len(scraped_res.get("text", "").strip()) > 100:
+                        real_article_scraped = scraped_res
+                        break
+                        
+        if real_article_scraped:
+            altered_sentences, match_percentage = compare_with_real_news(raw_text, real_article_scraped["text"])
+            if match_percentage < 95.0 and len(altered_sentences) > 0:
+                mismatch_penalty = min(50.0, (100.0 - match_percentage) * 1.5)
+                final_score = max(5.0, final_score - mismatch_penalty)
+            
         real_score = final_score
         fake_score = 100.0 - real_score
 
@@ -773,6 +901,18 @@ with col_diagnostics:
             <span style='background:{verdict_badge}; color:#E5E1DD; padding:0.4rem 1.2rem; border-radius:50px; font-weight:700; font-size:0.8rem;'>📢 System Verdict: {verdict_msg}</span>
         </div>
         """, unsafe_allow_html=True)
+
+        if real_article_scraped:
+            st.markdown(f"### 🔍 Original Document Integrity Check")
+            if match_percentage >= 95.0:
+                st.success(f"Original news match verified! Text aligns 100% with standard verified reporting from **[{real_article_scraped['title']}]({real_article_scraped['url']})**.")
+            else:
+                st.error(f"⚠️ **Injected / Altered Text Detected!** (Original document match rate: {match_percentage:.1f}%)")
+                st.markdown(f"The input matches the event published in **[{real_article_scraped['title']}]({real_article_scraped['url']})**, but has been altered or poisoned with unverified details.")
+                st.markdown("**Injected/Altered Sentences:**")
+                for sent in altered_sentences:
+                    st.markdown(f"- *\"{sent}\"*")
+            st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
 
         # Dynamic Grid rendering of actual computed model weights
         st.markdown("<div class='model-card-grid'>", unsafe_allow_html=True)
