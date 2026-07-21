@@ -1,4 +1,4 @@
-# VerifiQ: AI-Powered Fake News Detection Using Text Classification
+﻿# VerifiQ: AI-Powered Fake News Detection Using Text Classification
 
 Welcome to the documentation for the project **"AI-Powered Fake News Detection Using Text Classification"** developed for the **Summer Internship Program in AI & ML 2026**.
 

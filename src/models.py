@@ -2,6 +2,7 @@ from sklearn.linear_model import SGDClassifier, LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
+from sklearn.svm import SVC
 
 def get_models():
     """
@@ -29,6 +30,12 @@ def get_models():
             hidden_layer_sizes=(50,),
             max_iter=100,
             alpha=0.0001,
+            random_state=42
+        ),
+        "SVM": SVC(
+            C=1.0,
+            kernel="linear",
+            probability=True,
             random_state=42
         ),
         "Online_Logistic_Regression": SGDClassifier(

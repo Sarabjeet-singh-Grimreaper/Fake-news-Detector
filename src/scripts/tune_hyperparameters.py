@@ -50,6 +50,13 @@ def tune_models(subset_size=5000):
                 "hidden_layer_sizes": [(50,), (100,)]
             },
             "search_type": "grid"
+        },
+        "SVM": {
+            "model_ref": "SVM",
+            "grid": {
+                "C": [0.1, 1.0, 10.0]
+            },
+            "search_type": "grid"
         }
     }
 

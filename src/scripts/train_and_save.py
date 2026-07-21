@@ -15,6 +15,7 @@ def train_and_save_all():
         "LogReg": "logreg_model.pkl",
         "Random Forest": "random_forest_model.pkl",
         "NeuralNet": "neuralnet_model.pkl",
+        "SVM": "svm_model.pkl",
         "Online_Logistic_Regression": "sgd_online_model.pkl"
     }
     

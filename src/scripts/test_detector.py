@@ -29,6 +29,7 @@ def verify_detector():
         "Logistic Regression": "logreg",
         "Random Forest": "random_forest",
         "MLP Neural Network": "neuralnet",
+        "Support Vector Machine": "svm",
         "Online SGD Classifier": "sgd_online"
     }
     

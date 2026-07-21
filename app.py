@@ -283,7 +283,7 @@ def load_assets():
     except FileNotFoundError:
         assets["vectorizer"] = None
         
-    models = ["knn", "logreg", "random_forest", "neuralnet"]
+    models = ["knn", "logreg", "random_forest", "neuralnet", "svm"]
     for m in models:
         try:
             filename = f"models/{m}_model.pkl"
@@ -369,8 +369,8 @@ with st.sidebar:
 
     selected_models = st.multiselect(
         "Active Engine Classifiers",
-        options=["Logistic Regression", "Random Forest", "MLP Neural Net", "K-Nearest Neighbors"],
-        default=["Logistic Regression", "Random Forest", "MLP Neural Net", "K-Nearest Neighbors"],
+        options=["Logistic Regression", "Random Forest", "Neural Network (ANN/MLP)", "K-Nearest Neighbors", "Support Vector Machine (SVM)"],
+        default=["Logistic Regression", "Random Forest", "Neural Network (ANN/MLP)", "K-Nearest Neighbors", "Support Vector Machine (SVM)"],
         help="Select which machine learning models are included in the consensus vote."
     )
 
@@ -694,8 +694,9 @@ with col_diagnostics:
         for name, key in {
             "Logistic Regression": "logreg",
             "Random Forest": "random_forest",
-            "MLP Neural Net": "neuralnet",
-            "K-Nearest Neighbors": "knn"
+            "Neural Network (ANN/MLP)": "neuralnet",
+            "K-Nearest Neighbors": "knn",
+            "Support Vector Machine (SVM)": "svm"
         }.items():
             if name in selected_models:
                 model_keys.append(key)
@@ -703,8 +704,9 @@ with col_diagnostics:
         model_labels = {
             "logreg": "Online Logic Engine",
             "random_forest": "Random Forest Automata",
-            "neuralnet": "Neural Network Array",
-            "knn": "K-Nearest Neighbors"
+            "neuralnet": "Neural Network (ANN)",
+            "knn": "K-Nearest Neighbors",
+            "svm": "Support Vector Machine (SVM)"
         }
         
         for key in model_keys:
