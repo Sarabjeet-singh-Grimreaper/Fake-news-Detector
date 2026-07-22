@@ -29,18 +29,12 @@ def extract_features():
     vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(1, 2))
     X_tfidf = vectorizer.fit_transform(df['clean_text'])
     
-    # Compute dense metadata features
+    # Compute dense metadata features using upgraded stylometric, readability, clickbait, and sentiment indicators
+    from src.preprocessing import compute_dense_features
     dense_features = []
     for raw_text, clean_str in zip(df['text'], df['clean_text']):
-        raw_chars = max(1, len(raw_text))
-        raw_words = max(1, len(raw_text.split()))
-        
-        cap_ratio = sum(1 for c in raw_text if c.isupper()) / raw_chars
-        punc_density = sum(1 for c in raw_text if c in ['!', '?']) / raw_chars
-        avg_word_len = np.mean([len(w) for w in raw_text.split()]) if raw_text.split() else 0.0
-        sentiment_bias = sum(1 for w in clean_str.split() if w in EMOTIONAL_WORDS) / raw_words
-        
-        dense_features.append([cap_ratio, punc_density, avg_word_len, sentiment_bias])
+        feats = compute_dense_features(raw_text, clean_str)
+        dense_features.append(feats)
         
     X_dense = sp.csr_matrix(dense_features)
     

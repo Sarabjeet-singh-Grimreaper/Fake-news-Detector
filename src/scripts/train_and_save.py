@@ -16,7 +16,8 @@ def train_and_save_all():
         "Random Forest": "random_forest_model.pkl",
         "NeuralNet": "neuralnet_model.pkl",
         "SVM": "svm_model.pkl",
-        "Online_Logistic_Regression": "sgd_online_model.pkl"
+        "Online_Logistic_Regression": "sgd_online_model.pkl",
+        "Voting Ensemble": "voting_ensemble_model.pkl"
     }
     
     for name, model in models_dict.items():

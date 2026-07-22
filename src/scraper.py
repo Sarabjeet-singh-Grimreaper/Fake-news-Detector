@@ -49,10 +49,37 @@ def scrape_article(url):
             # Clean up empty lines
             full_text = re.sub(r'\n+', '\n\n', full_text).strip()
             
+        # Try to find author, date, publisher metadata
+        author = "Unknown Author"
+        date = "Unknown Date"
+        publisher = "Unknown Publisher"
+        category = "General"
+        
+        # Meta tag searches
+        meta_author = soup.find("meta", {"name": re.compile(r'author|creator', re.I)}) or soup.find("meta", {"property": re.compile(r'author', re.I)})
+        if meta_author:
+            author = meta_author.get("content", "").strip() or author
+            
+        meta_date = soup.find("meta", {"name": re.compile(r'date|publish|time', re.I)}) or soup.find("meta", {"property": re.compile(r'publish_time|published_time', re.I)})
+        if meta_date:
+            date = meta_date.get("content", "").strip() or date
+            
+        meta_pub = soup.find("meta", {"name": re.compile(r'publisher|source', re.I)}) or soup.find("meta", {"property": re.compile(r'og:site_name', re.I)})
+        if meta_pub:
+            publisher = meta_pub.get("content", "").strip() or publisher
+            
+        meta_cat = soup.find("meta", {"name": re.compile(r'category|section|topic', re.I)}) or soup.find("meta", {"property": re.compile(r'article:section', re.I)})
+        if meta_cat:
+            category = meta_cat.get("content", "").strip() or category
+
         return {
             "title": title,
             "text": full_text,
-            "url": url
+            "url": url,
+            "author": author,
+            "date": date,
+            "publisher": publisher,
+            "category": category
         }
     except Exception as e:
         return {"error": f"Failed to parse content: {str(e)}"}

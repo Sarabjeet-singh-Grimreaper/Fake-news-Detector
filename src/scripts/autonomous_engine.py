@@ -42,7 +42,7 @@ def extract_hybrid_features(raw_text, vectorizer):
     2. Punctuation Density (exclamation and question marks)
     3. Average Word Length
     4. Sentiment Bias
-    
+    ...
     Returns a combined scipy.sparse.csr_matrix.
     """
     # 1. Compute text TF-IDF vector (sparse representation)
@@ -52,30 +52,10 @@ def extract_hybrid_features(raw_text, vectorizer):
     # TF-IDF transform requires a list/iterable
     tfidf_sparse = vectorizer.transform([filtered_str])
     
-    # 2. Compute custom engineering metadata features (dense statistical)
-    if not raw_text:
-        cap_ratio = 0.0
-        punct_density = 0.0
-        avg_word_len = 0.0
-        sentiment_bias = 0.0
-    else:
-        # Clickbait Capitalization Ratio
-        letters_only = [c for c in raw_text if c.isalpha()]
-        cap_ratio = (sum(1 for c in letters_only if c.isupper()) / len(letters_only)) if letters_only else 0.0
-        
-        # Punctuation Density (tracking ! and ?)
-        excl_q_count = raw_text.count('!') + raw_text.count('?')
-        punct_density = excl_q_count / len(raw_text)
-        
-        # Average Word Length
-        words = raw_text.split()
-        avg_word_len = (sum(len(w) for w in words) / len(words)) if words else 0.0
-        
-        # Sentiment Bias
-        sentiment_bias = compute_sentiment_bias(raw_text)
-        
-    dense_features = np.array([[cap_ratio, punct_density, avg_word_len, sentiment_bias]], dtype=np.float64)
-    dense_sparse = sp.csr_matrix(dense_features)
+    # 2. Compute custom engineering metadata features (dense statistical) using shared helper
+    from src.preprocessing import compute_dense_features
+    dense_features = compute_dense_features(raw_text, filtered_str)
+    dense_sparse = sp.csr_matrix([dense_features])
     
     # Combine sparse TF-IDF and dense features
     combined_vector = sp.hstack([tfidf_sparse, dense_sparse], format="csr")
@@ -135,8 +115,8 @@ def load_or_init_model_and_vectorizer():
         model.classes_ = np.array([0, 1])
 
         
-    # Dynamically expand coefficients if shape mismatch exists (5000 TF-IDF features -> 5004 hybrid features)
-    expected_features = len(vectorizer.get_feature_names_out()) + 4
+    # Dynamically expand coefficients if shape mismatch exists (5000 TF-IDF features -> 5011 hybrid features)
+    expected_features = len(vectorizer.get_feature_names_out()) + 11
     if hasattr(model, "coef_") and model.coef_ is not None:
         current_features = model.coef_.shape[1]
         if current_features < expected_features:
@@ -260,7 +240,14 @@ def process_unlabeled_stream(new_articles_list, elite_threshold=0.96, review_thr
         "meta_capitalization_ratio", 
         "meta_punctuation_density", 
         "meta_avg_word_length", 
-        "meta_sentiment_bias"
+        "meta_clickbait_ratio",
+        "meta_unique_word_ratio",
+        "meta_avg_sentence_length",
+        "meta_polarity",
+        "meta_subjectivity",
+        "meta_readability_score",
+        "meta_quoted_sources",
+        "meta_num_urls"
     ]
     
     # Sort features by absolute coefficient shift magnitude

@@ -394,7 +394,7 @@ def load_assets():
     except FileNotFoundError:
         assets["vectorizer"] = None
         
-    models = ["knn", "logreg", "random_forest", "neuralnet", "svm"]
+    models = ["knn", "logreg", "random_forest", "neuralnet", "svm", "voting_ensemble"]
     for m in models:
         try:
             filename = f"models/{m}_model.pkl"
@@ -480,8 +480,8 @@ with st.sidebar:
 
     selected_models = st.multiselect(
         "Active Engine Classifiers",
-        options=["Logistic Regression", "Random Forest", "Neural Network (ANN/MLP)", "K-Nearest Neighbors", "Support Vector Machine (SVM)"],
-        default=["Logistic Regression", "Random Forest", "Neural Network (ANN/MLP)", "K-Nearest Neighbors", "Support Vector Machine (SVM)"],
+        options=["Logistic Regression", "Random Forest", "Neural Network (ANN/MLP)", "K-Nearest Neighbors", "Support Vector Machine (SVM)", "Calibrated Voting Ensemble"],
+        default=["Logistic Regression", "Random Forest", "Neural Network (ANN/MLP)", "K-Nearest Neighbors", "Support Vector Machine (SVM)", "Calibrated Voting Ensemble"],
         help="Select which machine learning models are included in the consensus vote."
     )
 
@@ -550,29 +550,22 @@ if workspace_mode == "🔐 Secure Admin Console":
                             # Vectorize text (5,000 features)
                             vec_text = assets["vectorizer"].transform([cleaned_text])
                             
-                            # Dense structural features
-                            t_chars = max(1, len(admin_text))
-                            words = admin_text.split()
-                            t_words = max(1, len(words))
-                            
-                            c_rat = sum(1 for c in admin_text if c.isupper()) / t_chars
-                            p_den = sum(1 for c in admin_text if c in ['!', '?']) / t_chars
-                            a_len = np.mean([len(w) for w in words]) if words else 0.0
-                            s_bias = sum(1 for w in cleaned_text.split() if w in EMOTIONAL_WORDS) / t_words
-                            
-                            dense_feats = np.array([[c_rat, p_den, a_len, s_bias]], dtype=np.float64)
-                            
-                            # scipy.sparse.hstack to bind features to 5004 dimensions
+                            # Dense structural features using 11 metrics
+                            from src.preprocessing import compute_dense_features
+                            dense_feats_list = compute_dense_features(admin_text, cleaned_text)
+                            dense_feats = np.array([dense_feats_list], dtype=np.float64)
+                             
+                            # scipy.sparse.hstack to bind features to 5011 dimensions
                             final_train_vector = sp.hstack([vec_text, sp.csr_matrix(dense_feats)])
-                            
-                            # Ensure 5004 features
+                             
+                            # Ensure 5011 features
                             actual_dim = final_train_vector.shape[1]
-                            if actual_dim != 5004:
-                                st.warning(f"Feature vector dimension is {actual_dim} instead of 5,004. Attempting auto-alignment.")
-                                if actual_dim > 5004:
-                                    final_train_vector = final_train_vector[:, :5004]
+                            if actual_dim != 5011:
+                                st.warning(f"Feature vector dimension is {actual_dim} instead of 5,011. Attempting auto-alignment.")
+                                if actual_dim > 5011:
+                                    final_train_vector = final_train_vector[:, :5011]
                                 else:
-                                    padding = sp.csr_matrix((1, 5004 - actual_dim))
+                                    padding = sp.csr_matrix((1, 5011 - actual_dim))
                                     final_train_vector = sp.hstack([final_train_vector, padding], format="csr")
                             
                             # Target array label 1
@@ -652,7 +645,7 @@ with col_workspace:
                 
     with input_tab2:
         st.image("assets/url_fetcher.png", caption="Cross-Border Remote Scraper Ingest", use_container_width=True)
-        news_url = st.text_input("International Article Target Link", placeholder="https://www.reuters.com/global-article-node...")
+        news_url = st.text_input("International Article Target Link", placeholder="https://www.reuters.com/global-article-node...", key="url_input")
         
         if st.button("Execute Stream Web Crawler", use_container_width=True) and news_url.strip():
             with st.spinner("Connecting to host node..."):
@@ -678,17 +671,12 @@ with col_workspace:
                 text_to_train = st.session_state["article_text"]
                 clean_train = full_preprocess_pipeline(text_to_train)
                 
-                # Extract current feature vector layers (yielding 5,004 features)
+                # Extract current feature vector layers (yielding 5,011 features)
                 vec_text = assets["vectorizer"].transform([clean_train])
-                t_chars = max(1, len(text_to_train))
-                t_words = max(1, len(text_to_train.split()))
+                from src.preprocessing import compute_dense_features
+                dense_feats_list = compute_dense_features(text_to_train, clean_train)
                 
-                c_rat = sum(1 for c in text_to_train if c.isupper()) / t_chars
-                p_den = sum(1 for c in text_to_train if c in ['!', '?']) / t_chars
-                a_len = np.mean([len(w) for w in text_to_train.split()]) if text_to_train.split() else 0.0
-                s_bias = sum(1 for w in clean_train.split() if w in EMOTIONAL_WORDS) / t_words
-                
-                dense_feats = np.array([[c_rat, p_den, a_len, s_bias]], dtype=np.float64)
+                dense_feats = np.array([dense_feats_list], dtype=np.float64)
                 final_train_vector = sp.hstack([vec_text, sp.csr_matrix(dense_feats)])
                 
                 target_y = np.array([1]) if feedback_label == "Real News" else np.array([0])
@@ -769,127 +757,163 @@ with col_diagnostics:
                 <div style='background: linear-gradient(90deg, rgba(8,58,79,0.3) 25%, rgba(64,126,140,0.5) 50%, rgba(8,58,79,0.3) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite linear; border-radius: 16px; height: 280px; width: 100%;'></div>
             """, unsafe_allow_html=True)
             
-        cleaned_text = full_preprocess_pipeline(st.session_state["article_text"])
-        original_word_count = len(st.session_state["article_text"].split())
-        cleaned_word_count = len(cleaned_text.split())
-        
-        loader.empty()
-        
-        # 1. TF-IDF Ingestion
-        vectorizer = assets["vectorizer"]
-        vectorized_input = vectorizer.transform([cleaned_text]) # 5,000 features
-        
-        # Extract Top Keyword Tokens
-        feature_names = np.array(vectorizer.get_feature_names_out())
-        row = vectorized_input.tocoo()
-        sorted_indices = np.argsort(row.data)[::-1]
-        top_tokens = [(feature_names[row.col[i]], row.data[i]) for i in sorted_indices[:5]]
-        
-        # Calculate the 4 custom dense engineering features
+        # Duplicate prediction caching
+        import hashlib
         raw_text = st.session_state["article_text"]
-        raw_chars = max(1, len(raw_text))
-        raw_words = max(1, len(raw_text.split()))
+        text_hash = hashlib.sha256(raw_text.encode('utf-8')).hexdigest()
+        if "pred_cache" not in st.session_state:
+            st.session_state["pred_cache"] = {}
+            
+        cached_result = st.session_state["pred_cache"].get(text_hash)
         
-        cap_ratio = sum(1 for c in raw_text if c.isupper()) / raw_chars
-        punc_density = sum(1 for c in raw_text if c in ['!', '?']) / raw_chars
-        avg_word_len = np.mean([len(w) for w in raw_text.split()]) if raw_text.split() else 0.0
-        sentiment_bias = sum(1 for w in cleaned_text.split() if w in EMOTIONAL_WORDS) / raw_words
-        
-        # Combine into the exact 5,004 dimensional feature shape expected by the models
-        dense_meta = np.array([[cap_ratio, punc_density, avg_word_len, sentiment_bias]], dtype=np.float64)
-        final_input = sp.hstack([vectorized_input, sp.csr_matrix(dense_meta)])
-        
-        # Loop through each trained classifier to compile actual real-time predictions
-        predictions_summary = []
-        model_keys = []
-        for name, key in {
-            "Logistic Regression": "logreg",
-            "Random Forest": "random_forest",
-            "Neural Network (ANN/MLP)": "neuralnet",
-            "K-Nearest Neighbors": "knn",
-            "Support Vector Machine (SVM)": "svm"
-        }.items():
-            if name in selected_models:
-                model_keys.append(key)
-                
-        model_labels = {
-            "logreg": "Online Logic Engine",
-            "random_forest": "Random Forest Automata",
-            "neuralnet": "Neural Network (ANN)",
-            "knn": "K-Nearest Neighbors",
-            "svm": "Support Vector Machine (SVM)"
-        }
-        
-        for key in model_keys:
-            active_model = assets.get(key)
-            if active_model is not None:
-                # Dynamic feature alignment to prevent mismatches
-                current_input = final_input
-                if hasattr(active_model, "n_features_in_"):
-                    expected = active_model.n_features_in_
-                    actual = current_input.shape[1]
-                    if actual > expected:
-                        current_input = current_input[:, :expected]
-                    elif actual < expected:
-                        padding = sp.csr_matrix((current_input.shape[0], expected - actual))
-                        current_input = sp.hstack([current_input, padding], format="csr")
-                
-                pred = active_model.predict(current_input)[0]
-                probs = active_model.predict_proba(current_input)[0]
-                confidence = probs[pred] * 100
-                predictions_summary.append((model_labels[key], pred, confidence, probs[1] * 100))
-        
-        # Compute exact consensus across running models
-        if predictions_summary:
-            real_scores = [item[3] for item in predictions_summary]
-            score = np.mean(real_scores)
+        if cached_result:
+            st.toast("Retrieved prediction from local duplicate cache!", icon="⚡")
+            real_score = cached_result["real_score"]
+            fake_score = cached_result["fake_score"]
+            predictions_summary = cached_result["predictions_summary"]
+            top_tokens = cached_result["top_tokens"]
+            dense_feats_list = cached_result["dense_feats_list"]
+            realtime_results = cached_result["realtime_results"]
+            real_article_scraped = cached_result["real_article_scraped"]
+            match_percentage = cached_result["match_percentage"]
+            altered_sentences = cached_result["altered_sentences"]
+            ai_prob = cached_result["ai_prob"]
+            cliche_count = cached_result["cliche_count"]
+            variance = cached_result["variance"]
         else:
-            score = 50.0
+            cleaned_text = full_preprocess_pipeline(raw_text)
+            original_word_count = len(raw_text.split())
+            cleaned_word_count = len(cleaned_text.split())
+        
+            loader.empty()
             
-        sensational_words = ["killed", "assassinated", "assassination", "dead", "death", "arrested", "clones", "conspiracy", "secret", "escape"]
-        has_sensational = any(word in raw_text.lower() for word in sensational_words)
-        
-        realtime_results = []
-        search_query = ""
-        if realtime_enabled or has_sensational or (score == 50.0):
-            realtime_results, search_query = check_realtime_sources(raw_text)
+            # 1. TF-IDF Ingestion
+            vectorizer = assets["vectorizer"]
+            vectorized_input = vectorizer.transform([cleaned_text]) # 5,000 features
             
-        final_score = calculate_hybrid_score(score, realtime_results, raw_text)
-        
-        # Analyze AI-generated writing style parameters
-        ai_prob, cliche_count, variance = analyze_ai_writing_style(raw_text)
-        
-        # Apply additional penalty for high probability AI text with zero web confirmation, scaled by confidence
-        if ai_prob > 0.65 and (not realtime_results or len(realtime_results) == 0):
-            confidence_factor = max(0.1, (100.0 - final_score) / 100.0)
-            final_score = max(5.0, final_score - (12.0 * confidence_factor))
+            # Extract Top Keyword Tokens
+            feature_names = np.array(vectorizer.get_feature_names_out())
+            row = vectorized_input.tocoo()
+            sorted_indices = np.argsort(row.data)[::-1]
+            top_tokens = [(feature_names[row.col[i]], row.data[i]) for i in sorted_indices[:5]]
             
-        # 2. Match original real news context to check for injected fake details
-        from src.scraper import scrape_article
-        real_article_scraped = None
-        altered_sentences = []
-        match_percentage = 100.0
-        
-        if realtime_results:
-            for r in realtime_results:
-                if r.get("query_type") != "claim":
-                    scraped_res = scrape_article(r["url"])
-                    if scraped_res and "error" not in scraped_res and len(scraped_res.get("text", "").strip()) > 100:
-                        real_article_scraped = scraped_res
-                        break
-                        
-        if real_article_scraped:
-            altered_sentences, match_percentage = compare_with_real_news(raw_text, real_article_scraped["text"])
-            if match_percentage < 95.0 and len(altered_sentences) > 0:
-                confidence_factor = max(0.2, (100.0 - final_score) / 100.0)
-                mismatch_penalty = min(30.0, (100.0 - match_percentage) * 1.0 * confidence_factor)
-                final_score = max(5.0, final_score - mismatch_penalty)
+            # Calculate the 11 custom dense engineering features
+            from src.preprocessing import compute_dense_features
+            dense_feats_list = compute_dense_features(raw_text, cleaned_text)
+            
+            # Combine into the exact 5,011 dimensional feature shape expected by the models
+            dense_meta = np.array([dense_feats_list], dtype=np.float64)
+            final_input = sp.hstack([vectorized_input, sp.csr_matrix(dense_meta)])
+            
+            # Loop through each trained classifier to compile actual real-time predictions
+            predictions_summary = []
+            model_keys = []
+            for name, key in {
+                "Logistic Regression": "logreg",
+                "Random Forest": "random_forest",
+                "Neural Network (ANN/MLP)": "neuralnet",
+                "K-Nearest Neighbors": "knn",
+                "Support Vector Machine (SVM)": "svm",
+                "Calibrated Voting Ensemble": "voting_ensemble"
+            }.items():
+                if name in selected_models:
+                    model_keys.append(key)
+                    
+            model_labels = {
+                "logreg": "Online Logic Engine",
+                "random_forest": "Random Forest Automata",
+                "neuralnet": "Neural Network (ANN)",
+                "knn": "K-Nearest Neighbors",
+                "svm": "Support Vector Machine (SVM)",
+                "voting_ensemble": "Calibrated Voting Ensemble"
+            }
+            
+            for key in model_keys:
+                active_model = assets.get(key)
+                if active_model is not None:
+                    # Dynamic feature alignment to prevent mismatches
+                    current_input = final_input
+                    if hasattr(active_model, "n_features_in_"):
+                        expected = active_model.n_features_in_
+                        actual = current_input.shape[1]
+                        if actual > expected:
+                            current_input = current_input[:, :expected]
+                        elif actual < expected:
+                            padding = sp.csr_matrix((current_input.shape[0], expected - actual))
+                            current_input = sp.hstack([current_input, padding], format="csr")
+                    
+                    pred = active_model.predict(current_input)[0]
+                    probs = active_model.predict_proba(current_input)[0]
+                    confidence = probs[pred] * 100
+                    predictions_summary.append((model_labels[key], pred, confidence, probs[1] * 100))
+            
+            # Compute exact consensus across running models
+            if predictions_summary:
+                real_scores = [item[3] for item in predictions_summary]
+                score = np.mean(real_scores)
             else:
-                # High-match verification against live scraped news overrides style-biased ML classifiers
-                final_score = max(final_score, 88.0)
+                score = 50.0
+                
+            sensational_words = ["killed", "assassinated", "assassination", "dead", "death", "arrested", "clones", "conspiracy", "secret", "escape"]
+            has_sensational = any(word in raw_text.lower() for word in sensational_words)
             
-        real_score = final_score
-        fake_score = 100.0 - real_score
+            realtime_results = []
+            search_query = ""
+            if realtime_enabled or has_sensational or (score == 50.0):
+                realtime_results, search_query = check_realtime_sources(raw_text)
+                
+            final_score = calculate_hybrid_score(score, realtime_results, raw_text)
+            
+            # Analyze AI-generated writing style parameters
+            ai_prob, cliche_count, variance = analyze_ai_writing_style(raw_text)
+            
+            # Apply additional penalty for high probability AI text with zero web confirmation, scaled by confidence
+            if ai_prob > 0.65 and (not realtime_results or len(realtime_results) == 0):
+                confidence_factor = max(0.1, (100.0 - final_score) / 100.0)
+                final_score = max(5.0, final_score - (12.0 * confidence_factor))
+                
+            # 2. Match original real news context to check for injected fake details
+            from src.scraper import scrape_article
+            real_article_scraped = None
+            altered_sentences = []
+            match_percentage = 100.0
+            
+            if realtime_results:
+                for r in realtime_results:
+                    if r.get("query_type") != "claim":
+                        scraped_res = scrape_article(r["url"])
+                        if scraped_res and "error" not in scraped_res and len(scraped_res.get("text", "").strip()) > 100:
+                            real_article_scraped = scraped_res
+                            break
+                            
+            if real_article_scraped:
+                altered_sentences, match_percentage = compare_with_real_news(raw_text, real_article_scraped["text"])
+                if match_percentage < 95.0 and len(altered_sentences) > 0:
+                    confidence_factor = max(0.2, (100.0 - final_score) / 100.0)
+                    mismatch_penalty = min(30.0, (100.0 - match_percentage) * 1.0 * confidence_factor)
+                    final_score = max(5.0, final_score - mismatch_penalty)
+                else:
+                    # High-match verification against live scraped news overrides style-biased ML classifiers
+                    final_score = max(final_score, 88.0)
+                
+            real_score = final_score
+            fake_score = 100.0 - real_score
+            
+            # Save to cache
+            st.session_state["pred_cache"][text_hash] = {
+                "real_score": real_score,
+                "fake_score": fake_score,
+                "predictions_summary": predictions_summary,
+                "top_tokens": top_tokens,
+                "dense_feats_list": dense_feats_list,
+                "realtime_results": realtime_results,
+                "real_article_scraped": real_article_scraped,
+                "match_percentage": match_percentage,
+                "altered_sentences": altered_sentences,
+                "ai_prob": ai_prob,
+                "cliche_count": cliche_count,
+                "variance": variance
+            }
 
         # Render Consolidated UI Gauge
         verdict_msg = "HIGH RISK MISINFORMATION" if fake_score >= 50.0 else "VERIFIED AUTHENTIC CONTEXT"
@@ -941,6 +965,54 @@ with col_diagnostics:
         else:
             st.warning("No classifier models loaded successfully.")
         st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Linguistic Stylometric Features & Metadata Indicators Display
+        st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
+        st.markdown("<h4 style='font-size:1.1rem; color:#C0D5D6; font-weight:700; margin-bottom:0.75rem;'>Linguistic Stylometric Features & Metadata Indicators</h4>", unsafe_allow_html=True)
+        
+        f_cols = st.columns(4)
+        with f_cols[0]:
+            st.metric(label="Readability FRE", value=f"{dense_feats_list[8]:.1f}", help="Flesch Reading Ease score (0-100 scale, higher is easier to read).")
+            st.metric(label="Clickbait Ratio", value=f"{dense_feats_list[3]*100:.1f}%", help="Percentage of clickbait trigger words in the text.")
+        with f_cols[1]:
+            st.metric(label="Avg Word Length", value=f"{dense_feats_list[2]:.2f} chars")
+            st.metric(label="Vocabulary Diversity", value=f"{dense_feats_list[4]*100:.1f}%", help="Unique words count divided by total word count.")
+        with f_cols[2]:
+            st.metric(label="Sentiment Polarity", value=f"{dense_feats_list[6]:.2f}", help="Scale from -1.0 (very negative) to +1.0 (very positive).")
+            st.metric(label="Subjectivity Score", value=f"{dense_feats_list[7]:.2f}", help="Scale from 0.0 (highly objective) to +1.0 (highly opinionated).")
+        with f_cols[3]:
+            st.metric(label="Quoted Sources", value=f"{int(dense_feats_list[9])} quotes", help="Number of quotation characters found in text.")
+            st.metric(label="Reference Links", value=f"{int(dense_feats_list[10])} URLs")
+
+        # Scraped URL Metadata & Domain Trust Score Display
+        if "url_input" in st.session_state and st.session_state.get("url_input"):
+            from urllib.parse import urlparse
+            url_str = st.session_state["url_input"].strip()
+            domain = urlparse(url_str).netloc.lower().replace("www.", "")
+            
+            TRUSTED_DOMAINS = {
+                "reuters.com": 100,
+                "apnews.com": 99,
+                "bbc.com": 98,
+                "nytimes.com": 97,
+                "bloomberg.com": 98,
+                "ndtv.com": 90,
+                "indiatoday.in": 90,
+                "thehindu.com": 92
+            }
+            domain_score = TRUSTED_DOMAINS.get(domain, 50)
+            
+            st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+            st.markdown("<h4 style='font-size:1.1rem; color:#C0D5D6; font-weight:700; margin-bottom:0.75rem;'>Scraped URL Metadata & Domain Trust</h4>", unsafe_allow_html=True)
+            m_cols = st.columns(3)
+            with m_cols[0]:
+                st.metric(label="Domain Authority Trust", value=f"{domain_score}/100", delta="Trusted Source" if domain_score >= 80 else "Low/Unverified Source")
+            with m_cols[1]:
+                publisher_name = real_article_scraped.get("publisher", "Unknown Publisher") if real_article_scraped else "Unknown Publisher"
+                st.metric(label="Publisher Site", value=publisher_name)
+            with m_cols[2]:
+                author_name = real_article_scraped.get("author", "Unknown Author") if real_article_scraped else "Unknown Author"
+                st.metric(label="Extracted Author", value=author_name)
                 
         # Telemetry & Diagnostic details
         st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)

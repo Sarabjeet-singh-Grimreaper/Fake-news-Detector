@@ -71,27 +71,55 @@ def tokenize_and_filter(text):
     words = text.split(' ')
     return " ".join([word for word in words if word and word not in STOPWORDS])
 
+def expand_contractions(text):
+    contractions_dict = {
+        "won't": "will not", "can't": "cannot", "don't": "do not", "shouldn't": "should not",
+        "needn't": "need not", "hasn't": "has not", "haven't": "have not", "weren't": "were not",
+        "wasn't": "was not", "didn't": "did not", "doesn't": "does not", "isn't": "is not",
+        "aren't": "are not", "ain't": "is not", "it's": "it is", "i'm": "i am", "he's": "he is",
+        "she's": "she is", "you're": "you are", "we're": "we are", "they're": "they are",
+        "i've": "i have", "you've": "you have", "we've": "we have", "they've": "they have",
+        "i'd": "i would", "you'd": "you would", "he'd": "he would", "she'd": "she would",
+        "we'd": "we would", "they'd": "they would", "i'll": "i will", "you'll": "you will",
+        "he'll": "he will", "she'll": "she will", "we'll": "we will", "they'll": "they will"
+    }
+    # Pattern to match contractions
+    pattern = re.compile(r'\b(' + '|'.join(re.escape(key) for key in contractions_dict.keys()) + r')\b')
+    return pattern.sub(lambda x: contractions_dict[x.group(0)], text)
+
 def full_preprocess_pipeline(text):
     if not text or not isinstance(text, str):
         return ""
     
-    # 1. Lowercase target string stream
+    # 1. Unicode Normalization (curly quotes, dashes, smart punctuation)
+    text = text.replace('“', '"').replace('”', '"').replace('’', "'").replace('‘', "'").replace('—', '-').replace('–', '-')
+    
+    # 2. Lowercase target string stream
     text = text.lower()
     
-    # 2. Strip Global Publisher Leakage & Datelines
+    # 3. Contraction Expansion
+    text = expand_contractions(text)
+    
+    # 4. Repeated character normalization (e.g., 'sooooo' -> 'soo')
+    text = re.sub(r'(.)\1{2,}', r'\1\1', text)
+    
+    # 5. Emoji & Non-ASCII removal (keep simple punctuation/alphanumeric)
+    text = re.sub(r'[^\x00-\x7F]+', ' ', text)
+    
+    # 6. Strip Global Publisher Leakage & Datelines
     # Removes patterns like "london (reuters) - ", "tokyo (ap) - ", etc.
     text = re.sub(r'^[a-z\s\.,\-_\|]+(\(reuters\)[^\-]*\-|\(ap\)[^\-]*\-)', '', text)
     text = re.sub(r'\b(reuters|ap|bbc|cnn|foxnews|truthunleashed)\b', '', text)
     text = re.sub(r'\bread more via\b.*$', '', text)
     
-    # 3. Strip URL patterns and email entities
+    # 7. Strip URL patterns and email entities
     text = re.sub(r'https?://\S+|www\.\S+', '', text)
     text = re.sub(r'\S+@\S+', '', text)
     
-    # 4. Extract word tokens between 3 and 15 alphabetic characters
+    # 8. Extract word tokens between 3 and 15 alphabetic characters
     words = re.findall(r'\b[a-z]{3,15}\b', text)
     
-    # 5. Native Optimized Academic Stopwords List & Domain/Publisher Leakage Filters
+    # 9. Native Optimized Academic Stopwords List & Domain/Publisher Leakage Filters
     stopwords = {
         "the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "to", "of", 
         "in", "for", "on", "with", "at", "by", "from", "this", "that", "these", "those",
@@ -109,3 +137,51 @@ def full_preprocess_pipeline(text):
     
     cleaned_tokens = [w for w in words if w not in stopwords]
     return " ".join(cleaned_tokens)
+
+def compute_dense_features(raw_text, clean_str):
+    import numpy as np
+    raw_chars = max(1, len(raw_text))
+    words = raw_text.split()
+    raw_words = max(1, len(words))
+    clean_words = clean_str.split()
+    clean_words_count = max(1, len(clean_words))
+    
+    # 1. Stylometry
+    letters_only = [c for c in raw_text if c.isalpha()]
+    cap_ratio = (sum(1 for c in letters_only if c.isupper()) / len(letters_only)) if letters_only else 0.0
+    avg_word_len = np.mean([len(w) for w in words]) if words else 0.0
+    unique_word_ratio = len(set(clean_words)) / clean_words_count
+    
+    sentences = [s for s in re.split(r'[.!?]+', raw_text) if s.strip()]
+    avg_sentence_len = len(words) / max(1, len(sentences))
+    
+    # 2. Punctuation & Clickbait
+    punc_density = sum(1 for c in raw_text if c in ['!', '?']) / raw_chars
+    
+    clickbait_words = {"breaking", "shocking", "must-see", "unbelievable", "secret", "exposed", "urgent", "viral", "insider", "banned", "conspiracy"}
+    clickbait_ratio = sum(1 for w in clean_words if w in clickbait_words) / clean_words_count
+    
+    # 3. Sentiment & Subjectivity
+    pos_words = {"great", "excellent", "good", "verify", "truth", "true", "positive", "credible", "reliable", "validated", "factual", "correct", "success"}
+    neg_words = {"fake", "worst", "terrible", "bad", "false", "hoax", "lie", "disaster", "negative", "unverified", "suspicious", "misleading", "conspiracy", "rumor"}
+    pos_count = sum(1 for w in clean_words if w in pos_words)
+    neg_count = sum(1 for w in clean_words if w in neg_words)
+    polarity = (pos_count - neg_count) / (pos_count + neg_count + 1e-5)
+    subjectivity = (pos_count + neg_count) / clean_words_count
+    
+    # 4. Readability (Flesch Reading Ease estimate)
+    def count_vowels(w):
+        return sum(1 for c in w.lower() if c in 'aeiou')
+    syllables = sum(max(1, count_vowels(w)) for w in words)
+    flesch_reading_ease = 206.835 - 1.015 * avg_sentence_len - 84.6 * (syllables / raw_words)
+    flesch_reading_ease = max(0.0, min(100.0, flesch_reading_ease)) # Clamped
+    
+    # 5. Credibility / Metadata
+    quoted_sources = raw_text.count('"') + raw_text.count("'")
+    num_urls = len(re.findall(r'https?://\S+|www\.\S+', raw_text))
+    
+    return [
+        cap_ratio, punc_density, avg_word_len, clickbait_ratio,
+        unique_word_ratio, avg_sentence_len, polarity, subjectivity,
+        flesch_reading_ease, quoted_sources, num_urls
+    ]
