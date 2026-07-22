@@ -118,14 +118,14 @@ def calculate_hybrid_score(ml_score, realtime_results, text):
     
     sensational_words = ["killed", "assassinated", "assassination", "dead", "death", "arrested", "clones", "conspiracy", "secret", "escape"]
     text_lower = text.lower()
-    has_sensational = any(word in text_lower for word in sensational_words)
+    has_sensational = any(re.search(r'\b' + re.escape(word) + r'\b', text_lower) for word in sensational_words)
     
     # Explicit fake indicators/misleading elements that suggest data poisoning or manual alteration
     fake_indicators = ["hoax", "conspiracy", "rigged", "unbelievable", "leaked", "secretly", "fake news", "deception", "fabricated", "clones"]
-    fake_indicator_count = sum(text_lower.count(word) for word in fake_indicators)
+    fake_indicator_count = sum(len(re.findall(r'\b' + re.escape(word) + r'\b', text_lower)) for word in fake_indicators)
     
     fake_signals = ["hoax", "false", "debunk", "untrue", "misleading", "fake", "fabricat", "rumor", "conspiracy", "unconfirmed"]
-    real_signals = ["true", "confirmed", "verified", "authentic", "official", "reuters", "associated press", "reported"]
+    real_signals = ["true", "confirmed", "verified", "authentic", "official", "reuters", "associated\s+press", "reported"]
     
     fake_hits = 0
     real_hits = 0
@@ -140,9 +140,9 @@ def calculate_hybrid_score(ml_score, realtime_results, text):
                 has_claim_query = True
             content = (r["title"] + " " + r["snippet"]).lower()
             
-            # Count signals
-            f_count = sum(1 for word in fake_signals if word in content)
-            r_count = sum(1 for word in real_signals if word in content)
+            # Count signals with strict word boundaries to avoid partial matches (like 'true' inside 'untrue')
+            f_count = sum(1 for word in fake_signals if re.search(r'\b' + re.escape(word) + r'\b', content))
+            r_count = sum(1 for word in real_signals if re.search(r'\b' + re.escape(word) + r'\b', content))
             
             if is_claim:
                 claim_fake_hits += f_count
@@ -153,7 +153,8 @@ def calculate_hybrid_score(ml_score, realtime_results, text):
                     
         # Score primary results
         if fake_hits > real_hits:
-            penalty = min(40.0, 12.0 * (fake_hits - real_hits))
+            confidence_factor = max(0.2, (100.0 - ml_score) / 100.0)
+            penalty = min(30.0, 8.0 * (fake_hits - real_hits) * confidence_factor)
             hybrid_score = max(5.0, hybrid_score - penalty)
         elif real_hits > fake_hits:
             boost = min(15.0, 4.0 * (real_hits - fake_hits))
@@ -162,15 +163,17 @@ def calculate_hybrid_score(ml_score, realtime_results, text):
         # Score secondary claim results specifically
         if has_claim_query:
             if claim_fake_hits > claim_real_hits or claim_real_hits == 0:
-                # If the sensational claim has debunking signals or zero verified reports, heavily penalize it
-                hybrid_score = max(5.0, hybrid_score - 55.0)
+                confidence_factor = max(0.2, (100.0 - ml_score) / 100.0)
+                hybrid_score = max(5.0, hybrid_score - (40.0 * confidence_factor))
     else:
         if has_sensational:
-            hybrid_score = max(10.0, ml_score - 35.0)
+            confidence_factor = max(0.2, (100.0 - ml_score) / 100.0)
+            hybrid_score = max(10.0, ml_score - (30.0 * confidence_factor))
             
-    # Apply direct penalty if explicit fake/misleading elements are injected to alter standard news
-    if fake_indicator_count >= 1:
-        penalty = min(55.0, 20.0 * fake_indicator_count)
+    # Apply direct penalty only if explicit fake indicators are dense and scale it based on ML confidence
+    if fake_indicator_count >= 2:
+        confidence_factor = max(0.1, (100.0 - ml_score) / 100.0)
+        penalty = min(35.0, 8.0 * fake_indicator_count * confidence_factor)
         hybrid_score = max(5.0, hybrid_score - penalty)
             
     return hybrid_score
@@ -221,7 +224,7 @@ def compare_with_real_news(user_text, real_news_text):
                 if best_ratio > 0.85:
                     break
                     
-        if best_ratio < 0.65: # Threshold below which sentence is considered altered/injected
+        if best_ratio < 0.55: # Lowered threshold to account for scraping boilerplate/variation
             altered_sentences.append(u_sent)
         else:
             matched_count += 1
@@ -230,9 +233,9 @@ def compare_with_real_news(user_text, real_news_text):
     return altered_sentences, match_percentage
 
 def analyze_ai_writing_style(text):
-    ai_cliches = ["delve", "tapestry", "testament", "pivotal", "catalyst", "moreover", "furthermore", "important to note", "underscores", "beacon of", "demystify"]
+    ai_cliches = ["delve", "tapestry", "testament", "pivotal", "catalyst", "important to note", "underscores", "beacon of", "demystify"]
     text_lower = text.lower()
-    cliche_count = sum(1 for word in ai_cliches if word in text_lower)
+    cliche_count = sum(1 for word in ai_cliches if re.search(r'\b' + re.escape(word) + r'\b', text_lower))
     
     sentences = [s.strip() for s in text.split('.') if s.strip()]
     if len(sentences) > 3:
@@ -245,7 +248,7 @@ def analyze_ai_writing_style(text):
         
     ai_prob = 0.0
     if cliche_count >= 1:
-        ai_prob += 0.15 * min(4, cliche_count)
+        ai_prob += 0.12 * min(4, cliche_count)
     if is_low_burstiness:
         ai_prob += 0.35
         
@@ -856,9 +859,10 @@ with col_diagnostics:
         # Analyze AI-generated writing style parameters
         ai_prob, cliche_count, variance = analyze_ai_writing_style(raw_text)
         
-        # Apply additional penalty for high probability AI text with zero web confirmation
-        if ai_prob > 0.5 and (not realtime_results or len(realtime_results) == 0):
-            final_score = max(5.0, final_score - 15.0)
+        # Apply additional penalty for high probability AI text with zero web confirmation, scaled by confidence
+        if ai_prob > 0.65 and (not realtime_results or len(realtime_results) == 0):
+            confidence_factor = max(0.1, (100.0 - final_score) / 100.0)
+            final_score = max(5.0, final_score - (12.0 * confidence_factor))
             
         # 2. Match original real news context to check for injected fake details
         from src.scraper import scrape_article
@@ -877,7 +881,8 @@ with col_diagnostics:
         if real_article_scraped:
             altered_sentences, match_percentage = compare_with_real_news(raw_text, real_article_scraped["text"])
             if match_percentage < 95.0 and len(altered_sentences) > 0:
-                mismatch_penalty = min(50.0, (100.0 - match_percentage) * 1.5)
+                confidence_factor = max(0.2, (100.0 - final_score) / 100.0)
+                mismatch_penalty = min(30.0, (100.0 - match_percentage) * 1.0 * confidence_factor)
                 final_score = max(5.0, final_score - mismatch_penalty)
             
         real_score = final_score

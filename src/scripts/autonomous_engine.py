@@ -81,21 +81,31 @@ def extract_hybrid_features(raw_text, vectorizer):
     combined_vector = sp.hstack([tfidf_sparse, dense_sparse], format="csr")
     return combined_vector
 
+def is_git_lfs_pointer(filepath):
+    if not os.path.exists(filepath):
+        return False
+    try:
+        with open(filepath, "rb") as f:
+            header = f.read(100)
+            return b"version https://git-lfs" in header
+    except Exception:
+        return False
+
 def load_or_init_model_and_vectorizer():
     """
     Loads the global TF-IDF vectorizer and online model.
     Adapts weights dynamically to fit the combined 5004-feature space.
     """
     # Load Vectorizer
-    if not os.path.exists(VECTORIZER_PATH):
-        raise FileNotFoundError(f"Global vectorizer file not found at {VECTORIZER_PATH}. Initialize the pipeline first.")
+    if not os.path.exists(VECTORIZER_PATH) or is_git_lfs_pointer(VECTORIZER_PATH):
+        raise FileNotFoundError(f"Global vectorizer file not found or is a Git LFS placeholder at {VECTORIZER_PATH}. Initialize the pipeline first.")
     
     with open(VECTORIZER_PATH, "rb") as f:
         vectorizer = pickle.load(f)
     
     # Load or initialize model
     model = None
-    if os.path.exists(MODEL_PATH):
+    if os.path.exists(MODEL_PATH) and not is_git_lfs_pointer(MODEL_PATH):
         try:
             with open(MODEL_PATH, "rb") as f:
                 model = pickle.load(f)
