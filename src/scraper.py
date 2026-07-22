@@ -32,14 +32,14 @@ def scrape_article(url):
         else:
             title = soup.title.string.strip() if soup.title else "Untitled Article"
             
-        # Try to extract paragraphs
-        paragraphs = soup.find_all("p")
+        # Try to extract paragraphs, headers, and list items
+        elements = soup.find_all(["p", "h1", "h2", "h3", "h4", "li"])
         text_content = []
-        for p in paragraphs:
-            p_text = p.get_text().strip()
+        for el in elements:
+            el_text = el.get_text().strip()
             # Ignore short snippets/nav links
-            if len(p_text.split()) > 5:
-                text_content.append(p_text)
+            if len(el_text.split()) > 4:
+                text_content.append(el_text)
                 
         full_text = "\n\n".join(text_content)
         
