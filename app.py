@@ -884,6 +884,9 @@ with col_diagnostics:
                 confidence_factor = max(0.2, (100.0 - final_score) / 100.0)
                 mismatch_penalty = min(30.0, (100.0 - match_percentage) * 1.0 * confidence_factor)
                 final_score = max(5.0, final_score - mismatch_penalty)
+            else:
+                # High-match verification against live scraped news overrides style-biased ML classifiers
+                final_score = max(final_score, 88.0)
             
         real_score = final_score
         fake_score = 100.0 - real_score

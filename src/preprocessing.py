@@ -91,11 +91,20 @@ def full_preprocess_pipeline(text):
     # 4. Extract word tokens between 3 and 15 alphabetic characters
     words = re.findall(r'\b[a-z]{3,15}\b', text)
     
-    # 5. Native Optimized Academic Stopwords List
+    # 5. Native Optimized Academic Stopwords List & Domain/Publisher Leakage Filters
     stopwords = {
         "the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "to", "of", 
         "in", "for", "on", "with", "at", "by", "from", "this", "that", "these", "those",
-        "it", "its", "they", "them", "their", "which", "who", "whom", "here", "there"
+        "it", "its", "they", "them", "their", "which", "who", "whom", "here", "there",
+        # Days of the week (to prevent day-of-week publisher artifacts)
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+        "mon", "tue", "wed", "thu", "fri", "sat", "sun",
+        # Temporal markers (to prevent time bias artifacts)
+        "today", "yesterday", "tomorrow", "tonight",
+        # Reporting verbs and publishing boilerplate
+        "said", "told", "reporters", "spokesman", "spokeswoman", "added", "stated", "reporting",
+        "read", "watch", "video", "image", "featured", "photo", "pic", "twitter", "com", "getty", "images",
+        "breaking", "cops", "reuters", "ap", "news", "via", "est", "edt"
     }
     
     cleaned_tokens = [w for w in words if w not in stopwords]
