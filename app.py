@@ -1,15 +1,18 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import streamlit as st
 import pickle
 import pandas as pd
 import numpy as np
 import time
-import os
 import scipy.sparse as sp
 import re
 import base64
 
 # Import pipeline components
-from src.preprocessing import full_preprocess_pipeline
+from src.preprocessing import full_preprocess_pipeline, compute_dense_features
 from src.scraper import scrape_article
 
 # 1. Page Configuration
@@ -551,7 +554,6 @@ if workspace_mode == "🔐 Secure Admin Console":
                             vec_text = assets["vectorizer"].transform([cleaned_text])
                             
                             # Dense structural features using 11 metrics
-                            from src.preprocessing import compute_dense_features
                             dense_feats_list = compute_dense_features(admin_text, cleaned_text)
                             dense_feats = np.array([dense_feats_list], dtype=np.float64)
                              
@@ -673,7 +675,6 @@ with col_workspace:
                 
                 # Extract current feature vector layers (yielding 5,011 features)
                 vec_text = assets["vectorizer"].transform([clean_train])
-                from src.preprocessing import compute_dense_features
                 dense_feats_list = compute_dense_features(text_to_train, clean_train)
                 
                 dense_feats = np.array([dense_feats_list], dtype=np.float64)
@@ -798,7 +799,6 @@ with col_diagnostics:
             top_tokens = [(feature_names[row.col[i]], row.data[i]) for i in sorted_indices[:5]]
             
             # Calculate the 11 custom dense engineering features
-            from src.preprocessing import compute_dense_features
             dense_feats_list = compute_dense_features(raw_text, cleaned_text)
             
             # Combine into the exact 5,011 dimensional feature shape expected by the models
