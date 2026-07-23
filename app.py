@@ -956,10 +956,6 @@ with col_diagnostics:
                 "domain_cred": domain_cred
             }
 
-        # Render Consolidated UI Gauge
-        verdict_msg = "HIGH RISK MISINFORMATION" if fake_score >= 50.0 else "VERIFIED AUTHENTIC CONTEXT"
-        verdict_badge = "#A58D66" if fake_score >= 50.0 else "#407E8C"
-        
         st.markdown(f"""
         <div style='background: rgba(2, 13, 20, 0.5); border: 1px solid rgba(192,213,214,0.1); border-radius:20px; padding:1.5rem; text-align:center; margin-bottom:1.5rem;'>
             <span style='font-size:0.75rem; text-transform:uppercase; color:#C0D5D6; font-weight:600;'>Linguistic Credibility Distribution</span>
@@ -972,6 +968,86 @@ with col_diagnostics:
                 <div style='width:{fake_score}%; background:linear-gradient(90deg, #A58D66, #E5E1DD);'></div>
             </div>
             <span style='background:{verdict_badge}; color:#E5E1DD; padding:0.4rem 1.2rem; border-radius:50px; font-weight:700; font-size:0.8rem;'>📢 System Verdict: {verdict_msg}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # AI Investigation Report Block
+        risk_level = "HIGH" if fake_score >= 70.0 else ("MEDIUM" if fake_score >= 40.0 else "LOW")
+        readability_val = dense_feats_list[9]
+        readability_lbl = "Difficult" if readability_val < 50.0 else ("Standard" if readability_val < 80.0 else "Easy")
+        
+        sentiment_val = dense_feats_list[14]
+        sentiment_lbl = "Highly Negative" if sentiment_val < -0.2 else ("Positive" if sentiment_val > 0.2 else "Neutral")
+        
+        reasons = []
+        if dense_feats_list[18] > 0.05:
+            reasons.append("✓ Clickbait word density is higher than normal.")
+        if dense_feats_list[16] > 0.02:
+            reasons.append("✓ Sentiment bias/sensational vocabulary intensity is high.")
+        if readability_val < 50.0:
+            reasons.append("✓ Article readability requires advanced parsing.")
+        if 'domain_cred' in locals() and domain_cred and domain_cred.get("score", 50) < 60:
+            reasons.append("✓ Domain trust rating is relatively low/unverified.")
+        elif 'domain_cred' in locals() and domain_cred and domain_cred.get("score", 50) >= 80:
+            reasons.append("✓ Domain trust aligns with high-authority press registries.")
+        if dense_feats_list[0] < 0.4:
+            reasons.append("✓ Lexical vocabulary density is low.")
+            
+        contrib_feats = []
+        if 'expl_results' in locals() and expl_results and not expl_results.get("error"):
+            word_list = expl_results["top_fake_words"] if fake_score >= 50.0 else expl_results["top_real_words"]
+            for item in word_list[:3]:
+                contrib_feats.append(f"\"{item[0].upper()}\"")
+        if dense_feats_list[17] > 0:
+            contrib_feats.append("Excessive punctuation usage")
+        if dense_feats_list[0] < 0.4:
+            contrib_feats.append("Repetitive style keywords")
+        if not contrib_feats:
+            contrib_feats = ["General news vocabulary"]
+            
+        reasons_html = "".join([f"<div style='margin-bottom: 0.35rem; color: #C0D5D6;'>{r}</div>" for r in reasons[:5]])
+        feats_html = "".join([f"<li style='color: #E5E1DD; font-size: 0.85rem; margin-bottom: 0.25rem;'>{f}</li>" for f in contrib_feats])
+        
+        st.markdown(f"""
+        <div style='background: rgba(2, 13, 20, 0.6); border: 2px dashed rgba(192, 213, 214, 0.15); border-radius: 16px; padding: 1.5rem; font-family: Courier New, monospace; margin-bottom: 1.5rem;'>
+            <div style='text-align: center; border-bottom: 1px dashed rgba(192, 213, 214, 0.2); padding-bottom: 1rem; margin-bottom: 1rem;'>
+                <div style='font-size: 1.25rem; font-weight: 800; color: #C0D5D6; letter-spacing: 2px;'>📋 VERIFIQ AI INVESTIGATION REPORT</div>
+                <div style='font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;'>CREDIBILITY EVALUATION LOG REPORT</div>
+            </div>
+            
+            <div style='display: flex; justify-content: space-between; margin-bottom: 1rem;'>
+                <div>
+                    <span style='color: #64748b; font-size: 0.75rem; display: block; text-transform: uppercase;'>Prediction</span>
+                    <strong style='color: {"#A58D66" if fake_score >= 50.0 else "#407E8C"}; font-size: 1.1rem;'>{verdict_msg}</strong>
+                </div>
+                <div style='text-align: right;'>
+                    <span style='color: #64748b; font-size: 0.75rem; display: block; text-transform: uppercase;'>Confidence</span>
+                    <strong style='color: #E5E1DD; font-size: 1.1rem;'>{max(real_score, fake_score):.1f}%</strong>
+                </div>
+            </div>
+            
+            <div style='margin-bottom: 1rem;'>
+                <span style='color: #64748b; font-size: 0.75rem; display: block; text-transform: uppercase; margin-bottom: 0.4rem;'>Diagnostics Reasoning</span>
+                <div style='font-size: 0.85rem;'>
+                    {reasons_html}
+                </div>
+            </div>
+            
+            <div style='margin-bottom: 1rem;'>
+                <span style='color: #64748b; font-size: 0.75rem; display: block; text-transform: uppercase; margin-bottom: 0.4rem;'>Top Contributing Features</span>
+                <ul style='margin: 0; padding-left: 1.2rem;'>
+                    {feats_html}
+                </ul>
+            </div>
+            
+            <div style='border-top: 1px dashed rgba(192, 213, 214, 0.2); padding-top: 1rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem; font-size: 0.8rem;'>
+                <div><span style='color: #64748b;'>Words:</span> <strong style='color: #E5E1DD;'>{int(dense_feats_list[28])}</strong></div>
+                <div><span style='color: #64748b;'>Reading Time:</span> <strong style='color: #E5E1DD;'>{dense_feats_list[29]:.1f} min</strong></div>
+                <div><span style='color: #64748b;'>Readability:</span> <strong style='color: #E5E1DD;'>{readability_lbl}</strong></div>
+                <div><span style='color: #64748b;'>Sentiment:</span> <strong style='color: #E5E1DD;'>{sentiment_lbl}</strong></div>
+                <div><span style='color: #64748b;'>Domain Trust:</span> <strong style='color: #E5E1DD;'>{domain_cred.get("score", 50)}/100</strong></div>
+                <div><span style='color: #64748b;'>Overall Risk:</span> <strong style='color: {"#A58D66" if fake_score >= 70.0 else ("#e0a96d" if fake_score >= 40.0 else "#407E8C")}; font-weight: bold;'>{risk_level}</strong></div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
