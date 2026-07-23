@@ -23,6 +23,11 @@ def verify_detector():
     print("\n[Verification] Loading saved model assets...")
     with open("models/tfidf_vectorizer.pkl", "rb") as f:
         vectorizer = pickle.load(f)
+    try:
+        with open("models/dense_scaler.pkl", "rb") as f:
+            scaler = pickle.load(f)
+    except FileNotFoundError:
+        scaler = None
         
     models = {
         "K-Nearest Neighbors": "knn",
@@ -57,6 +62,8 @@ def verify_detector():
         from src.preprocessing import compute_dense_features
         dense_feats_list = compute_dense_features(text_raw, cleaned)
         dense_feats = np.array([dense_feats_list], dtype=np.float64)
+        if scaler is not None:
+            dense_feats = scaler.transform(dense_feats)
         final_vector = sp.hstack([vectorized, sp.csr_matrix(dense_feats)])
         
         for model_name, file_key in models.items():

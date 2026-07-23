@@ -36,7 +36,11 @@ def extract_features():
         feats = compute_dense_features(raw_text, clean_str)
         dense_features.append(feats)
         
-    X_dense = sp.csr_matrix(dense_features)
+    # Scale dense features to [0, 1] range to match TF-IDF magnitude
+    from sklearn.preprocessing import MinMaxScaler
+    scaler = MinMaxScaler()
+    dense_scaled = scaler.fit_transform(dense_features)
+    X_dense = sp.csr_matrix(dense_scaled)
     
     # Combine sparse TF-IDF and dense features
     X_combined = sp.hstack([X_tfidf, X_dense], format="csr")
@@ -44,9 +48,11 @@ def extract_features():
     
     X_train, X_test, y_train, y_test = train_test_split(X_combined, y, test_size=0.2, random_state=42, stratify=y)
     
-    # Serialize the global vectorizer mapping to disk
+    # Serialize the global vectorizer mapping and scaler to disk
     os.makedirs("models", exist_ok=True)
     with open("models/tfidf_vectorizer.pkl", "wb") as f:
         pickle.dump(vectorizer, f)
+    with open("models/dense_scaler.pkl", "wb") as f:
+        pickle.dump(scaler, f)
         
     return X_train, X_test, y_train, y_test, vectorizer

@@ -55,6 +55,14 @@ def extract_hybrid_features(raw_text, vectorizer):
     # 2. Compute custom engineering metadata features (dense statistical) using shared helper
     from src.preprocessing import compute_dense_features
     dense_features = compute_dense_features(raw_text, filtered_str)
+    
+    # Scale dense features if scaler exists
+    scaler_path = "models/dense_scaler.pkl"
+    if os.path.exists(scaler_path):
+        with open(scaler_path, "rb") as f:
+            scaler = pickle.load(f)
+        dense_features = scaler.transform([dense_features])[0]
+        
     dense_sparse = sp.csr_matrix([dense_features])
     
     # Combine sparse TF-IDF and dense features

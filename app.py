@@ -397,6 +397,12 @@ def load_assets():
     except FileNotFoundError:
         assets["vectorizer"] = None
         
+    try:
+        with open("models/dense_scaler.pkl", "rb") as f:
+            assets["scaler"] = pickle.load(f)
+    except FileNotFoundError:
+        assets["scaler"] = None
+        
     models = ["knn", "logreg", "random_forest", "neuralnet", "svm", "voting_ensemble"]
     for m in models:
         try:
@@ -803,6 +809,8 @@ with col_diagnostics:
             
             # Combine into the exact 5,011 dimensional feature shape expected by the models
             dense_meta = np.array([dense_feats_list], dtype=np.float64)
+            if assets.get("scaler") is not None:
+                dense_meta = assets["scaler"].transform(dense_meta)
             final_input = sp.hstack([vectorized_input, sp.csr_matrix(dense_meta)])
             
             # Loop through each trained classifier to compile actual real-time predictions
