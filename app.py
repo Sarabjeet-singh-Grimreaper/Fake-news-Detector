@@ -393,23 +393,16 @@ st.markdown("""
 @st.cache_resource
 def load_assets():
     assets = {}
-    try:
-        with open("models/tfidf_vectorizer.pkl", "rb") as f:
-            assets["vectorizer"] = pickle.load(f)
-    except FileNotFoundError:
-        assets["vectorizer"] = None
-        
-    try:
-        with open("models/dense_scaler.pkl", "rb") as f:
-            assets["scaler"] = pickle.load(f)
-    except FileNotFoundError:
-        assets["scaler"] = None
-        
-    try:
-        with open("models/feature_selector.pkl", "rb") as f:
-            assets["selector"] = pickle.load(f)
-    except FileNotFoundError:
-        assets["selector"] = None
+    for filename in ["tfidf_vectorizer.pkl", "dense_scaler.pkl", "feature_selector.pkl"]:
+        if not os.path.exists(f"models/{filename}"):
+            raise FileNotFoundError(f"Required model asset models/{filename} is missing.")
+            
+    with open("models/tfidf_vectorizer.pkl", "rb") as f:
+        assets["vectorizer"] = pickle.load(f)
+    with open("models/dense_scaler.pkl", "rb") as f:
+        assets["scaler"] = pickle.load(f)
+    with open("models/feature_selector.pkl", "rb") as f:
+        assets["selector"] = pickle.load(f)
         
     models = ["knn", "logreg", "random_forest", "neuralnet", "svm", "voting_ensemble"]
     for m in models:
@@ -430,7 +423,11 @@ def load_assets():
             assets[m] = None
     return assets
 
-assets = load_assets()
+try:
+    assets = load_assets()
+except Exception as e:
+    st.error(f"🛡️ **Model assets not initialized**: {str(e)} Please run the training script (`python -m src.scripts.train_and_save`) to generate model assets locally and push them to your repository, or restart the server.")
+    st.stop()
 
 # Initialize Session State
 if "article_text" not in st.session_state:
