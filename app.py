@@ -956,6 +956,9 @@ with col_diagnostics:
                 "domain_cred": domain_cred
             }
 
+        verdict_msg = "HIGH RISK MISINFORMATION" if fake_score >= 50.0 else "VERIFIED AUTHENTIC CONTEXT"
+        verdict_badge = "#A58D66" if fake_score >= 50.0 else "#407E8C"
+
         st.markdown(f"""
         <div style='background: rgba(2, 13, 20, 0.5); border: 1px solid rgba(192,213,214,0.1); border-radius:20px; padding:1.5rem; text-align:center; margin-bottom:1.5rem;'>
             <span style='font-size:0.75rem; text-transform:uppercase; color:#C0D5D6; font-weight:600;'>Linguistic Credibility Distribution</span>
