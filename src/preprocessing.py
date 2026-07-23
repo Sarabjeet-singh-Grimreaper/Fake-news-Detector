@@ -127,10 +127,16 @@ def full_preprocess_pipeline(text):
         # Days of the week (to prevent day-of-week publisher artifacts)
         "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
         "mon", "tue", "wed", "thu", "fri", "sat", "sun",
+        # Months (to prevent monthly bias artifacts)
+        "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
+        "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+        # Political/Figure entities to prevent topical name-memorization leakage
+        "trump", "obama", "hillary", "clinton", "biden", "bush", "sanders", "donald", "barack",
+        "gop", "republican", "republicans", "democrat", "democrats", "democratic", "sen", "rep",
         # Temporal markers (to prevent time bias artifacts)
-        "today", "yesterday", "tomorrow", "tonight",
+        "today", "yesterday", "tomorrow", "tonight", "election",
         # Reporting verbs and publishing boilerplate
-        "said", "told", "reporters", "spokesman", "spokeswoman", "added", "stated", "reporting",
+        "said", "told", "reporters", "spokesman", "spokeswoman", "added", "stated", "reporting", "statement", "comment",
         "read", "watch", "video", "image", "featured", "photo", "pic", "twitter", "com", "getty", "images",
         "breaking", "cops", "reuters", "ap", "news", "via", "est", "edt"
     }
@@ -146,39 +152,41 @@ def compute_dense_features(raw_text, clean_str):
     clean_words = clean_str.split()
     clean_words_count = max(1, len(clean_words))
     
-    # 1. Stylometry
-    letters_only = [c for c in raw_text if c.isalpha()]
-    cap_ratio = (sum(1 for c in letters_only if c.isupper()) / len(letters_only)) if letters_only else 0.0
-    avg_word_len = np.mean([len(w) for w in words]) if words else 0.0
+    # 1. Stylometry - Optimized
+    n_upper = len(re.findall(r'[A-Z]', raw_text))
+    n_alpha = len(re.findall(r'[a-zA-Z]', raw_text))
+    cap_ratio = n_upper / n_alpha if n_alpha else 0.0
+    avg_word_len = sum(len(w) for w in words) / raw_words
     unique_word_ratio = len(set(clean_words)) / clean_words_count
     
-    sentences = [s for s in re.split(r'[.!?]+', raw_text) if s.strip()]
-    avg_sentence_len = len(words) / max(1, len(sentences))
+    # Fast sentence split
+    sentences_count = max(1, raw_text.count('.') + raw_text.count('!') + raw_text.count('?'))
+    avg_sentence_len = len(words) / sentences_count
     
-    # 2. Punctuation & Clickbait
-    punc_density = sum(1 for c in raw_text if c in ['!', '?']) / raw_chars
+    # 2. Punctuation & Clickbait - Optimized
+    punc_density = (raw_text.count('!') + raw_text.count('?')) / raw_chars
     
     clickbait_words = {"breaking", "shocking", "must-see", "unbelievable", "secret", "exposed", "urgent", "viral", "insider", "banned", "conspiracy"}
-    clickbait_ratio = sum(1 for w in clean_words if w in clickbait_words) / clean_words_count
+    clickbait_ratio = sum(clean_words.count(w) for w in clickbait_words) / clean_words_count
     
-    # 3. Sentiment & Subjectivity
+    # 3. Sentiment & Subjectivity - Optimized
     pos_words = {"great", "excellent", "good", "verify", "truth", "true", "positive", "credible", "reliable", "validated", "factual", "correct", "success"}
     neg_words = {"fake", "worst", "terrible", "bad", "false", "hoax", "lie", "disaster", "negative", "unverified", "suspicious", "misleading", "conspiracy", "rumor"}
-    pos_count = sum(1 for w in clean_words if w in pos_words)
-    neg_count = sum(1 for w in clean_words if w in neg_words)
+    pos_count = sum(clean_words.count(w) for w in pos_words)
+    neg_count = sum(clean_words.count(w) for w in neg_words)
     polarity = (pos_count - neg_count) / (pos_count + neg_count + 1e-5)
     subjectivity = (pos_count + neg_count) / clean_words_count
     
-    # 4. Readability (Flesch Reading Ease estimate)
-    def count_vowels(w):
-        return sum(1 for c in w.lower() if c in 'aeiou')
-    syllables = sum(max(1, count_vowels(w)) for w in words)
+    # 4. Readability (Flesch Reading Ease estimate) - Optimized
+    text_lower = raw_text.lower()
+    total_vowels = sum(text_lower.count(v) for v in 'aeiou')
+    syllables = max(raw_words, total_vowels)
     flesch_reading_ease = 206.835 - 1.015 * avg_sentence_len - 84.6 * (syllables / raw_words)
     flesch_reading_ease = max(0.0, min(100.0, flesch_reading_ease)) # Clamped
     
-    # 5. Credibility / Metadata
+    # 5. Credibility / Metadata - Optimized
     quoted_sources = raw_text.count('"') + raw_text.count("'")
-    num_urls = len(re.findall(r'https?://\S+|www\.\S+', raw_text))
+    num_urls = raw_text.count('http://') + raw_text.count('https://') + raw_text.count('www.')
     
     return [
         cap_ratio, punc_density, avg_word_len, clickbait_ratio,

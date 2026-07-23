@@ -845,7 +845,7 @@ with col_diagnostics:
                     pred = active_model.predict(current_input)[0]
                     probs = active_model.predict_proba(current_input)[0]
                     confidence = probs[pred] * 100
-                    predictions_summary.append((model_labels[key], pred, confidence, probs[1] * 100))
+                    predictions_summary.append((model_labels[key], pred, confidence, probs[1] * 100, probs[0] * 100))
             
             # Compute exact consensus across running models
             if predictions_summary:
@@ -950,7 +950,7 @@ with col_diagnostics:
         st.markdown("<div class='model-card-grid'>", unsafe_allow_html=True)
         if len(predictions_summary) > 0:
             m_cols = st.columns(len(predictions_summary))
-            for idx, (name, pred, conf, _) in enumerate(predictions_summary):
+            for idx, (name, pred, conf, p_real, p_fake) in enumerate(predictions_summary):
                 with m_cols[idx]:
                     lbl = "Real" if pred == 1 else "Fake"
                     color = "#407E8C" if pred == 1 else "#A58D66"
@@ -960,6 +960,7 @@ with col_diagnostics:
                         <div style='font-size: 0.75rem; color: #C0D5D6; margin-bottom: 0.5rem;'>{name}</div>
                         <span style='background: {bg}; border: 1px solid {color}; color: {color}; font-size: 0.7rem; padding: 0.25rem 0.75rem; border-radius: 8px; font-weight: 700; text-transform: uppercase;'>{lbl}</span>
                         <div style='font-size: 0.85rem; color: #E5E1DD; font-weight: 600; margin-top: 0.5rem;'>{conf:.1f}% Certainty</div>
+                        <div style='font-size: 0.7rem; color: #C0D5D6; margin-top: 0.25rem;'>Real: {p_real:.1f}% | Fake: {p_fake:.1f}%</div>
                     </div>
                     """, unsafe_allow_html=True)
         else:

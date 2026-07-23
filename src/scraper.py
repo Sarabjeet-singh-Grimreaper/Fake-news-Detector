@@ -32,8 +32,15 @@ def scrape_article(url):
         else:
             title = soup.title.string.strip() if soup.title else "Untitled Article"
             
+        # Try to find the main article container to filter out boilerplate sidebars/footers
+        article_container = soup.find(["article", "main"]) or soup.find(id=re.compile(r'article|content|main', re.I)) or soup.find(class_=re.compile(r'article|content|main', re.I))
+        
         # Try to extract paragraphs, headers, and list items
-        elements = soup.find_all(["p", "h1", "h2", "h3", "h4", "li"])
+        if article_container:
+            elements = article_container.find_all(["p", "h1", "h2", "h3", "h4", "li"])
+        else:
+            elements = soup.find_all(["p", "h1", "h2", "h3", "h4", "li"])
+            
         text_content = []
         for el in elements:
             el_text = el.get_text().strip()
