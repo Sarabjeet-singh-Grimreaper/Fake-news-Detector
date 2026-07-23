@@ -1011,48 +1011,42 @@ with col_diagnostics:
         reasons_html = "".join([f"<div style='margin-bottom: 0.35rem; color: #C0D5D6;'>{r}</div>" for r in reasons[:5]])
         feats_html = "".join([f"<li style='color: #E5E1DD; font-size: 0.85rem; margin-bottom: 0.25rem;'>{f}</li>" for f in contrib_feats])
         
-        st.markdown(f"""
-        <div style='background: rgba(2, 13, 20, 0.6); border: 2px dashed rgba(192, 213, 214, 0.15); border-radius: 16px; padding: 1.5rem; font-family: Courier New, monospace; margin-bottom: 1.5rem;'>
-            <div style='text-align: center; border-bottom: 1px dashed rgba(192, 213, 214, 0.2); padding-bottom: 1rem; margin-bottom: 1rem;'>
-                <div style='font-size: 1.25rem; font-weight: 800; color: #C0D5D6; letter-spacing: 2px;'>📋 VERIFIQ AI INVESTIGATION REPORT</div>
-                <div style='font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;'>CREDIBILITY EVALUATION LOG REPORT</div>
-            </div>
-            
-            <div style='display: flex; justify-content: space-between; margin-bottom: 1rem;'>
-                <div>
-                    <span style='color: #64748b; font-size: 0.75rem; display: block; text-transform: uppercase;'>Prediction</span>
-                    <strong style='color: {"#A58D66" if fake_score >= 50.0 else "#407E8C"}; font-size: 1.1rem;'>{verdict_msg}</strong>
-                </div>
-                <div style='text-align: right;'>
-                    <span style='color: #64748b; font-size: 0.75rem; display: block; text-transform: uppercase;'>Confidence</span>
-                    <strong style='color: #E5E1DD; font-size: 1.1rem;'>{max(real_score, fake_score):.1f}%</strong>
-                </div>
-            </div>
-            
-            <div style='margin-bottom: 1rem;'>
-                <span style='color: #64748b; font-size: 0.75rem; display: block; text-transform: uppercase; margin-bottom: 0.4rem;'>Diagnostics Reasoning</span>
-                <div style='font-size: 0.85rem;'>
-                    {reasons_html}
-                </div>
-            </div>
-            
-            <div style='margin-bottom: 1rem;'>
-                <span style='color: #64748b; font-size: 0.75rem; display: block; text-transform: uppercase; margin-bottom: 0.4rem;'>Top Contributing Features</span>
-                <ul style='margin: 0; padding-left: 1.2rem;'>
-                    {feats_html}
-                </ul>
-            </div>
-            
-            <div style='border-top: 1px dashed rgba(192, 213, 214, 0.2); padding-top: 1rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem; font-size: 0.8rem;'>
-                <div><span style='color: #64748b;'>Words:</span> <strong style='color: #E5E1DD;'>{int(dense_feats_list[28])}</strong></div>
-                <div><span style='color: #64748b;'>Reading Time:</span> <strong style='color: #E5E1DD;'>{dense_feats_list[29]:.1f} min</strong></div>
-                <div><span style='color: #64748b;'>Readability:</span> <strong style='color: #E5E1DD;'>{readability_lbl}</strong></div>
-                <div><span style='color: #64748b;'>Sentiment:</span> <strong style='color: #E5E1DD;'>{sentiment_lbl}</strong></div>
-                <div><span style='color: #64748b;'>Domain Trust:</span> <strong style='color: #E5E1DD;'>{domain_cred.get("score", 50)}/100</strong></div>
-                <div><span style='color: #64748b;'>Overall Risk:</span> <strong style='color: {"#A58D66" if fake_score >= 70.0 else ("#e0a96d" if fake_score >= 40.0 else "#407E8C")}; font-weight: bold;'>{risk_level}</strong></div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"""<div style='background: rgba(2, 13, 20, 0.6); border: 2px dashed rgba(192, 213, 214, 0.15); border-radius: 16px; padding: 1.5rem; font-family: Courier New, monospace; margin-bottom: 1.5rem;'>
+<div style='text-align: center; border-bottom: 1px dashed rgba(192, 213, 214, 0.2); padding-bottom: 1rem; margin-bottom: 1rem;'>
+<div style='font-size: 1.25rem; font-weight: 800; color: #C0D5D6; letter-spacing: 2px;'>📋 VERIFIQ AI INVESTIGATION REPORT</div>
+<div style='font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;'>CREDIBILITY EVALUATION LOG REPORT</div>
+</div>
+<div style='display: flex; justify-content: space-between; margin-bottom: 1rem;'>
+<div>
+<span style='color: #64748b; font-size: 0.75rem; display: block; text-transform: uppercase;'>Prediction</span>
+<strong style='color: {"#A58D66" if fake_score >= 50.0 else "#407E8C"}; font-size: 1.1rem;'>{verdict_msg}</strong>
+</div>
+<div style='text-align: right;'>
+<span style='color: #64748b; font-size: 0.75rem; display: block; text-transform: uppercase;'>Confidence</span>
+<strong style='color: #E5E1DD; font-size: 1.1rem;'>{max(real_score, fake_score):.1f}%</strong>
+</div>
+</div>
+<div style='margin-bottom: 1rem;'>
+<span style='color: #64748b; font-size: 0.75rem; display: block; text-transform: uppercase; margin-bottom: 0.4rem;'>Diagnostics Reasoning</span>
+<div style='font-size: 0.85rem;'>
+{reasons_html}
+</div>
+</div>
+<div style='margin-bottom: 1rem;'>
+<span style='color: #64748b; font-size: 0.75rem; display: block; text-transform: uppercase; margin-bottom: 0.4rem;'>Top Contributing Features</span>
+<ul style='margin: 0; padding-left: 1.2rem;'>
+{feats_html}
+</ul>
+</div>
+<div style='border-top: 1px dashed rgba(192, 213, 214, 0.2); padding-top: 1rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem; font-size: 0.8rem;'>
+<div><span style='color: #64748b;'>Words:</span> <strong style='color: #E5E1DD;'>{int(dense_feats_list[28])}</strong></div>
+<div><span style='color: #64748b;'>Reading Time:</span> <strong style='color: #E5E1DD;'>{dense_feats_list[29]:.1f} min</strong></div>
+<div><span style='color: #64748b;'>Readability:</span> <strong style='color: #E5E1DD;'>{readability_lbl}</strong></div>
+<div><span style='color: #64748b;'>Sentiment:</span> <strong style='color: #E5E1DD;'>{sentiment_lbl}</strong></div>
+<div><span style='color: #64748b;'>Domain Trust:</span> <strong style='color: #E5E1DD;'>{domain_cred.get("score", 50)}/100</strong></div>
+<div><span style='color: #64748b;'>Overall Risk:</span> <strong style='color: {"#A58D66" if fake_score >= 70.0 else ("#e0a96d" if fake_score >= 40.0 else "#407E8C")}; font-weight: bold;'>{risk_level}</strong></div>
+</div>
+</div>""", unsafe_allow_html=True)
 
         if real_article_scraped:
             st.markdown(f"### 🔍 Original Document Integrity Check")
