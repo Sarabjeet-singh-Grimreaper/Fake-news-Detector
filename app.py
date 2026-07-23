@@ -805,7 +805,10 @@ with col_diagnostics:
             loader.empty()
             
             # 1. TF-IDF Ingestion
-            vectorizer = assets["vectorizer"]
+            vectorizer = assets.get("vectorizer")
+            if vectorizer is None:
+                st.error("🛡️ **Model assets not initialized**: The TF-IDF vectorizer could not be found or loaded. Please run the training script (`python -m src.scripts.train_and_save`) to generate model assets, then clear the Streamlit cache (top-right menu -> Clear Cache) and refresh.")
+                st.stop()
             vectorized_input = vectorizer.transform([cleaned_text]) # 5,000 features
             
             # Extract Top Keyword Tokens
