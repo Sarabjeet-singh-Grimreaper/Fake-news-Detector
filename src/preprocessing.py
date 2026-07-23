@@ -144,52 +144,124 @@ def full_preprocess_pipeline(text):
     cleaned_tokens = [w for w in words if w not in stopwords]
     return " ".join(cleaned_tokens)
 
-def compute_dense_features(raw_text, clean_str):
+def compute_dense_features(raw_text, clean_str, title=""):
     import numpy as np
+    from collections import Counter
+    
+    # Standard fallback values if text is empty
     raw_chars = max(1, len(raw_text))
     words = raw_text.split()
     raw_words = max(1, len(words))
     clean_words = clean_str.split()
     clean_words_count = max(1, len(clean_words))
     
-    # 1. Stylometry - Optimized
-    n_upper = len(re.findall(r'[A-Z]', raw_text))
-    n_alpha = len(re.findall(r'[a-zA-Z]', raw_text))
-    cap_ratio = n_upper / n_alpha if n_alpha else 0.0
-    avg_word_len = sum(len(w) for w in words) / raw_words
-    unique_word_ratio = len(set(clean_words)) / clean_words_count
+    # --- Writing Style (Lexical & Stylometric) ---
+    unique_words = set(clean_words)
+    lexical_diversity = len(unique_words) / clean_words_count
+    ttr = len(unique_words) / clean_words_count
     
-    # Fast sentence split
+    # Hapax Legomena Ratio (words occurring exactly once)
+    clean_word_counts = Counter(clean_words)
+    hapax_count = sum(1 for w, count in clean_word_counts.items() if count == 1)
+    hapax_ratio = hapax_count / clean_words_count
+    
+    # Fast sentence count estimation
     sentences_count = max(1, raw_text.count('.') + raw_text.count('!') + raw_text.count('?'))
     avg_sentence_len = len(words) / sentences_count
+    avg_word_len = sum(len(w) for w in words) / raw_words
     
-    # 2. Punctuation & Clickbait - Optimized
-    punc_density = (raw_text.count('!') + raw_text.count('?')) / raw_chars
+    # Character ratios
+    punct_density = sum(1 for c in raw_text if c in '.,!?;:"\'()[]{}') / raw_chars
+    digit_ratio = sum(1 for c in raw_text if c.isdigit()) / raw_chars
+    uppercase_ratio = len(re.findall(r'[A-Z]', raw_text)) / raw_chars
     
-    clickbait_words = {"breaking", "shocking", "must-see", "unbelievable", "secret", "exposed", "urgent", "viral", "insider", "banned", "conspiracy"}
-    clickbait_ratio = sum(clean_words.count(w) for w in clickbait_words) / clean_words_count
+    # Stopword Ratio
+    from src.preprocessing import STOPWORDS
+    stopword_count = sum(1 for w in words if w.lower() in STOPWORDS)
+    stopword_ratio = stopword_count / raw_words
     
-    # 3. Sentiment & Subjectivity - Optimized
+    # --- Readability Metrics ---
+    # Syllables estimation
+    text_lower = raw_text.lower()
+    total_vowels = sum(text_lower.count(v) for v in 'aeiou')
+    syllables = max(raw_words, total_vowels)
+    
+    # Flesch Reading Ease (FRE)
+    flesch_reading_ease = 206.835 - 1.015 * avg_sentence_len - 84.6 * (syllables / raw_words)
+    flesch_reading_ease = max(0.0, min(100.0, flesch_reading_ease))
+    
+    # Flesch-Kincaid Grade Level
+    flesch_kincaid_grade = 0.39 * avg_sentence_len + 11.8 * (syllables / raw_words) - 15.59
+    flesch_kincaid_grade = max(0.0, min(20.0, flesch_kincaid_grade))
+    
+    # Complex words (syllables >= 3)
+    complex_words = sum(1 for w in words if sum(1 for c in w.lower() if c in 'aeiou') >= 3)
+    complex_word_ratio = complex_words / raw_words
+    
+    # Gunning Fog Index
+    gunning_fog = 0.4 * (avg_sentence_len + 100 * complex_word_ratio)
+    gunning_fog = max(0.0, min(20.0, gunning_fog))
+    
+    # Coleman-Liau Index
+    letters_only = len(re.findall(r'[a-zA-Z0-9]', raw_text))
+    L = (letters_only / raw_words) * 100
+    S = (sentences_count / raw_words) * 100
+    coleman_liau = 0.0588 * L - 0.296 * S - 15.8
+    coleman_liau = max(0.0, min(20.0, coleman_liau))
+    
+    # SMOG Index
+    smog_index = 1.0430 * np.sqrt(complex_words * (30 / sentences_count)) + 3.1291
+    smog_index = max(0.0, min(20.0, smog_index))
+    
+    # --- Emotion Metrics ---
     pos_words = {"great", "excellent", "good", "verify", "truth", "true", "positive", "credible", "reliable", "validated", "factual", "correct", "success"}
     neg_words = {"fake", "worst", "terrible", "bad", "false", "hoax", "lie", "disaster", "negative", "unverified", "suspicious", "misleading", "conspiracy", "rumor"}
     pos_count = sum(clean_words.count(w) for w in pos_words)
     neg_count = sum(clean_words.count(w) for w in neg_words)
+    
     polarity = (pos_count - neg_count) / (pos_count + neg_count + 1e-5)
     subjectivity = (pos_count + neg_count) / clean_words_count
     
-    # 4. Readability (Flesch Reading Ease estimate) - Optimized
-    text_lower = raw_text.lower()
-    total_vowels = sum(text_lower.count(v) for v in 'aeiou')
-    syllables = max(raw_words, total_vowels)
-    flesch_reading_ease = 206.835 - 1.015 * avg_sentence_len - 84.6 * (syllables / raw_words)
-    flesch_reading_ease = max(0.0, min(100.0, flesch_reading_ease)) # Clamped
+    # Emotion Intensity (Sensationalized/Emotional Vocabulary density)
+    emotional_vocabulary = {"shocking", "leaked", "secret", "urgent", "viral", "exposed", "unbelievable", "miracle", "warning", "banned", "chaos", "destroys", "slam", "blasts", "panic", "terror", "crisis"}
+    emotion_intensity = sum(clean_words.count(w) for w in emotional_vocabulary) / clean_words_count
     
-    # 5. Credibility / Metadata - Optimized
-    quoted_sources = raw_text.count('"') + raw_text.count("'")
-    num_urls = raw_text.count('http://') + raw_text.count('https://') + raw_text.count('www.')
+    # --- Clickbait Features ---
+    excessive_punct = 1.0 if ("!!!" in raw_text or "???" in raw_text or "!?" in raw_text) else 0.0
+    
+    clickbait_words = {"breaking", "shocking", "must-see", "unbelievable", "secret", "exposed", "urgent", "viral", "insider", "banned", "conspiracy"}
+    clickbait_ratio = sum(clean_words.count(w) for w in clickbait_words) / clean_words_count
+    
+    all_caps_words = sum(1 for w in words if w.isupper() and len(w) > 2)
+    all_caps_ratio = all_caps_words / raw_words
+    
+    sensational_phrases = {"you won't believe", "what happened next", "secret they don't want you to know", "shocked the world", "the truth about"}
+    sensational_count = sum(1 for phrase in sensational_phrases if phrase in text_lower)
+    sensational_ratio = sensational_count / sentences_count
+    
+    urgency_indicators = {"now", "urgent", "immediately", "hurry", "last chance", "breaking news"}
+    urgency_count = sum(1 for indicator in urgency_indicators if indicator in text_lower)
+    urgency_ratio = urgency_count / clean_words_count
+    
+    # --- Metadata Features ---
+    title_str = str(title) if title else ""
+    title_length_chars = len(title_str)
+    title_length_words = len(title_str.split())
+    
+    article_length_chars = len(raw_text)
+    paragraph_count = max(1, raw_text.count('\n\n') + 1)
+    quotation_count = raw_text.count('"') + raw_text.count("'")
+    external_links = raw_text.count('http://') + raw_text.count('https://') + raw_text.count('www.')
+    
+    word_count = len(words)
+    reading_time = word_count / 200.0  # Standard average reading speed
     
     return [
-        cap_ratio, punc_density, avg_word_len, clickbait_ratio,
-        unique_word_ratio, avg_sentence_len, polarity, subjectivity,
-        flesch_reading_ease, quoted_sources, num_urls
+        lexical_diversity, ttr, hapax_ratio, avg_sentence_len, avg_word_len,
+        punct_density, digit_ratio, uppercase_ratio, stopword_ratio,
+        flesch_reading_ease, flesch_kincaid_grade, gunning_fog, coleman_liau, smog_index,
+        polarity, subjectivity, emotion_intensity,
+        excessive_punct, clickbait_ratio, all_caps_ratio, sensational_ratio, urgency_ratio,
+        title_length_chars, title_length_words, article_length_chars,
+        paragraph_count, quotation_count, external_links, word_count, reading_time
     ]

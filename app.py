@@ -14,6 +14,8 @@ import base64
 # Import pipeline components
 from src.preprocessing import full_preprocess_pipeline, compute_dense_features
 from src.scraper import scrape_article
+from src.domain_trust import get_domain_credibility
+from src.explainability import explain_prediction
 
 # 1. Page Configuration
 st.set_page_config(
@@ -403,6 +405,12 @@ def load_assets():
     except FileNotFoundError:
         assets["scaler"] = None
         
+    try:
+        with open("models/feature_selector.pkl", "rb") as f:
+            assets["selector"] = pickle.load(f)
+    except FileNotFoundError:
+        assets["selector"] = None
+        
     models = ["knn", "logreg", "random_forest", "neuralnet", "svm", "voting_ensemble"]
     for m in models:
         try:
@@ -787,6 +795,8 @@ with col_diagnostics:
             ai_prob = cached_result["ai_prob"]
             cliche_count = cached_result["cliche_count"]
             variance = cached_result["variance"]
+            expl_results = cached_result.get("expl_results")
+            domain_cred = cached_result.get("domain_cred")
         else:
             cleaned_text = full_preprocess_pipeline(raw_text)
             original_word_count = len(raw_text.split())
@@ -804,14 +814,23 @@ with col_diagnostics:
             sorted_indices = np.argsort(row.data)[::-1]
             top_tokens = [(feature_names[row.col[i]], row.data[i]) for i in sorted_indices[:5]]
             
-            # Calculate the 11 custom dense engineering features
-            dense_feats_list = compute_dense_features(raw_text, cleaned_text)
+            # Determine title if available
+            title_text = title_input if 'title_input' in locals() and title_input else "Manual Text Entry"
             
-            # Combine into the exact 5,011 dimensional feature shape expected by the models
+            # Calculate the 30 custom dense engineering features
+            dense_feats_list = compute_dense_features(raw_text, cleaned_text, title_text)
+            
+            # Scale dense features
             dense_meta = np.array([dense_feats_list], dtype=np.float64)
             if assets.get("scaler") is not None:
                 dense_meta = assets["scaler"].transform(dense_meta)
-            final_input = sp.hstack([vectorized_input, sp.csr_matrix(dense_meta)])
+                
+            # Apply feature selector to TF-IDF input
+            tfidf_selected = vectorized_input
+            if assets.get("selector") is not None:
+                tfidf_selected = assets["selector"].transform(vectorized_input)
+                
+            final_input = sp.hstack([tfidf_selected, sp.csr_matrix(dense_meta)])
             
             # Loop through each trained classifier to compile actual real-time predictions
             predictions_summary = []
@@ -907,6 +926,18 @@ with col_diagnostics:
             real_score = final_score
             fake_score = 100.0 - real_score
             
+            # Domain Trust Assessment
+            url_val = url_input if 'url_input' in locals() and url_input else ""
+            domain_cred = get_domain_credibility(url_val)
+            
+            # Explainability Metrics
+            expl_results = None
+            if assets.get("logreg") is not None and assets.get("selector") is not None:
+                expl_results = explain_prediction(
+                    raw_text, cleaned_text, vectorized_input, dense_feats_list,
+                    assets["logreg"], vectorizer, assets["selector"]
+                )
+            
             # Save to cache
             st.session_state["pred_cache"][text_hash] = {
                 "real_score": real_score,
@@ -920,7 +951,9 @@ with col_diagnostics:
                 "altered_sentences": altered_sentences,
                 "ai_prob": ai_prob,
                 "cliche_count": cliche_count,
-                "variance": variance
+                "variance": variance,
+                "expl_results": expl_results,
+                "domain_cred": domain_cred
             }
 
         # Render Consolidated UI Gauge
@@ -981,47 +1014,70 @@ with col_diagnostics:
         
         f_cols = st.columns(4)
         with f_cols[0]:
-            st.metric(label="Readability FRE", value=f"{dense_feats_list[8]:.1f}", help="Flesch Reading Ease score (0-100 scale, higher is easier to read).")
-            st.metric(label="Clickbait Ratio", value=f"{dense_feats_list[3]*100:.1f}%", help="Percentage of clickbait trigger words in the text.")
+            st.metric(label="Readability FRE", value=f"{dense_feats_list[9]:.1f}", help="Flesch Reading Ease score (0-100 scale, higher is easier to read).")
+            st.metric(label="Flesch-Kincaid Grade", value=f"{dense_feats_list[10]:.1f}", help="Estimated school grade level needed to read this text.")
+            st.metric(label="Gunning Fog Index", value=f"{dense_feats_list[11]:.1f}")
         with f_cols[1]:
-            st.metric(label="Avg Word Length", value=f"{dense_feats_list[2]:.2f} chars")
-            st.metric(label="Vocabulary Diversity", value=f"{dense_feats_list[4]*100:.1f}%", help="Unique words count divided by total word count.")
+            st.metric(label="Vocabulary Diversity", value=f"{dense_feats_list[0]*100:.1f}%", help="Unique words count divided by total word count.")
+            st.metric(label="Type-Token Ratio", value=f"{dense_feats_list[1]:.2f}")
+            st.metric(label="Uppercase Ratio", value=f"{dense_feats_list[7]*100:.1f}%")
         with f_cols[2]:
-            st.metric(label="Sentiment Polarity", value=f"{dense_feats_list[6]:.2f}", help="Scale from -1.0 (very negative) to +1.0 (very positive).")
-            st.metric(label="Subjectivity Score", value=f"{dense_feats_list[7]:.2f}", help="Scale from 0.0 (highly objective) to +1.0 (highly opinionated).")
+            st.metric(label="Sentiment Polarity", value=f"{dense_feats_list[14]:.2f}", help="Scale from -1.0 (very negative) to +1.0 (very positive).")
+            st.metric(label="Subjectivity Score", value=f"{dense_feats_list[15]:.2f}", help="Scale from 0.0 (highly objective) to +1.0 (highly opinionated).")
+            st.metric(label="Emotion Intensity", value=f"{dense_feats_list[16]*100:.1f}%")
         with f_cols[3]:
-            st.metric(label="Quoted Sources", value=f"{int(dense_feats_list[9])} quotes", help="Number of quotation characters found in text.")
-            st.metric(label="Reference Links", value=f"{int(dense_feats_list[10])} URLs")
+            st.metric(label="Clickbait Word Ratio", value=f"{dense_feats_list[18]*100:.1f}%")
+            st.metric(label="Quoted Sources Count", value=f"{int(dense_feats_list[26])}")
+            st.metric(label="External Links Count", value=f"{int(dense_feats_list[27])}")
+
+        # Explainability Expander
+        if 'expl_results' in locals() and expl_results and "error" not in expl_results:
+            st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
+            with st.expander("🔍 Deep Model Explainability & Contribution Diagnostics", expanded=True):
+                st.markdown("### Feature Category Contributions")
+                cat_summary = expl_results["category_summary"]
+                st.bar_chart(pd.Series(cat_summary), horizontal=True)
+                
+                ec_cols = st.columns(2)
+                with ec_cols[0]:
+                    st.markdown("##### Top Words Predicting REAL News")
+                    for word, contrib, val in expl_results.get("top_real_words", []):
+                        st.markdown(f"- **`{word}`**: +{contrib:.4f} (tf-idf: {val:.3f})")
+                    if not expl_results.get("top_real_words"):
+                        st.markdown("*No positive words found in text.*")
+                with ec_cols[1]:
+                    st.markdown("##### Top Words Predicting FAKE News")
+                    for word, contrib, val in expl_results.get("top_fake_words", []):
+                        st.markdown(f"- **`{word}`**: {contrib:.4f} (tf-idf: {val:.3f})")
+                    if not expl_results.get("top_fake_words"):
+                        st.markdown("*No negative words found in text.*")
+                        
+                st.markdown("##### Dense Feature Contributions")
+                dense_contrib_df = pd.DataFrame(expl_results["dense_contributions"])
+                st.dataframe(dense_contrib_df.rename(columns={"feature": "Feature Indicator", "value": "Value", "contribution": "Contribution Score"}), use_container_width=True)
 
         # Scraped URL Metadata & Domain Trust Score Display
-        if "url_input" in st.session_state and st.session_state.get("url_input"):
-            from urllib.parse import urlparse
-            url_str = st.session_state["url_input"].strip()
-            domain = urlparse(url_str).netloc.lower().replace("www.", "")
-            
-            TRUSTED_DOMAINS = {
-                "reuters.com": 100,
-                "apnews.com": 99,
-                "bbc.com": 98,
-                "nytimes.com": 97,
-                "bloomberg.com": 98,
-                "ndtv.com": 90,
-                "indiatoday.in": 90,
-                "thehindu.com": 92
-            }
-            domain_score = TRUSTED_DOMAINS.get(domain, 50)
-            
+        if 'domain_cred' in locals() and domain_cred and domain_cred.get("domain") != "N/A":
             st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
             st.markdown("<h4 style='font-size:1.1rem; color:#C0D5D6; font-weight:700; margin-bottom:0.75rem;'>Scraped URL Metadata & Domain Trust</h4>", unsafe_allow_html=True)
-            m_cols = st.columns(3)
+            
+            # Show Quality Warning if poor
+            if real_article_scraped and real_article_scraped.get("poor_quality"):
+                st.warning("⚠️ **Low Extraction Quality**: Scraped content contains very short text or low sentence count. This prediction might be unreliable (e.g., paywall/cookie block).")
+                
+            m_cols = st.columns(4)
             with m_cols[0]:
-                st.metric(label="Domain Authority Trust", value=f"{domain_score}/100", delta="Trusted Source" if domain_score >= 80 else "Low/Unverified Source")
+                badge = domain_cred.get("badge", "Neutral")
+                score = domain_cred.get("score", 50)
+                st.metric(label="Domain Trust Score", value=f"{score}/100", delta=badge)
             with m_cols[1]:
-                publisher_name = real_article_scraped.get("publisher", "Unknown Publisher") if real_article_scraped else "Unknown Publisher"
-                st.metric(label="Publisher Site", value=publisher_name)
+                st.metric(label="Domain netloc", value=domain_cred.get("domain", "N/A"), help=domain_cred.get("status", ""))
             with m_cols[2]:
-                author_name = real_article_scraped.get("author", "Unknown Author") if real_article_scraped else "Unknown Author"
-                st.metric(label="Extracted Author", value=author_name)
+                pub = real_article_scraped.get("publisher", "Unknown Publisher") if real_article_scraped else "Unknown Publisher"
+                st.metric(label="Publisher Site", value=pub)
+            with m_cols[3]:
+                auth = real_article_scraped.get("author", "Unknown Author") if real_article_scraped else "Unknown Author"
+                st.metric(label="Extracted Author", value=auth)
                 
         # Telemetry & Diagnostic details
         st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)

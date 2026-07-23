@@ -20,7 +20,7 @@ def get_models():
         "LogReg": LogisticRegression(
             C=10.0,
             penalty="l2",
-            max_iter=1000,
+            max_iter=5000,
             random_state=42
         ),
         "Random Forest": RandomForestClassifier(
@@ -46,7 +46,7 @@ def get_models():
         "Voting Ensemble": CalibratedClassifierCV(
             estimator=VotingClassifier(
                 estimators=[
-                    ("logreg", LogisticRegression(C=10.0, penalty="l2", max_iter=1000, random_state=42)),
+                    ("logreg", LogisticRegression(C=10.0, penalty="l2", max_iter=5000, random_state=42)),
                     ("rf", RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)),
                     ("nn", MLPClassifier(hidden_layer_sizes=(100,), max_iter=200, alpha=0.0001, random_state=42)),
                     ("svm", CalibratedClassifierCV(LinearSVC(dual=False, random_state=42), cv=3))

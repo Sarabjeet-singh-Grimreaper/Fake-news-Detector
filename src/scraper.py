@@ -61,6 +61,8 @@ def scrape_article(url):
         date = "Unknown Date"
         publisher = "Unknown Publisher"
         category = "General"
+        canonical_url = url
+        language = "en"
         
         # Meta tag searches
         meta_author = soup.find("meta", {"name": re.compile(r'author|creator', re.I)}) or soup.find("meta", {"property": re.compile(r'author', re.I)})
@@ -78,7 +80,24 @@ def scrape_article(url):
         meta_cat = soup.find("meta", {"name": re.compile(r'category|section|topic', re.I)}) or soup.find("meta", {"property": re.compile(r'article:section', re.I)})
         if meta_cat:
             category = meta_cat.get("content", "").strip() or category
-
+            
+        meta_canon = soup.find("link", {"rel": "canonical"}) or soup.find("meta", {"property": "og:url"})
+        if meta_canon:
+            canonical_url = meta_canon.get("href", "").strip() or meta_canon.get("content", "").strip() or canonical_url
+            
+        html_tag = soup.find("html")
+        if html_tag and html_tag.get("lang"):
+            language = html_tag.get("lang").strip().split('-')[0].lower()
+            
+        # Calculate statistics
+        word_count = len(full_text.split())
+        article_length = len(full_text)
+        reading_time = max(0.5, round(word_count / 200.0, 1))
+        
+        # Quality check
+        sentences_count = max(1, full_text.count('.') + full_text.count('!') + full_text.count('?'))
+        poor_quality = word_count < 50 or sentences_count < 3
+        
         return {
             "title": title,
             "text": full_text,
@@ -86,7 +105,13 @@ def scrape_article(url):
             "author": author,
             "date": date,
             "publisher": publisher,
-            "category": category
+            "category": category,
+            "canonical_url": canonical_url,
+            "language": language,
+            "word_count": word_count,
+            "article_length": article_length,
+            "reading_time": reading_time,
+            "poor_quality": poor_quality
         }
     except Exception as e:
         return {"error": f"Failed to parse content: {str(e)}"}
