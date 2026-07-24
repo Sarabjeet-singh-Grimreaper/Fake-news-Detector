@@ -421,6 +421,14 @@ def load_assets():
                     assets[m] = pickle.load(f)
         except Exception:
             assets[m] = None
+            
+    # Load optimal threshold
+    try:
+        with open("models/optimal_threshold.pkl", "rb") as f:
+            assets["optimal_threshold"] = pickle.load(f).get("threshold", 0.5)
+    except Exception:
+        assets["optimal_threshold"] = 0.5
+        
     return assets
 
 try:
@@ -870,8 +878,9 @@ with col_diagnostics:
                             padding = sp.csr_matrix((current_input.shape[0], expected - actual))
                             current_input = sp.hstack([current_input, padding], format="csr")
                     
-                    pred = active_model.predict(current_input)[0]
                     probs = active_model.predict_proba(current_input)[0]
+                    threshold = assets.get("optimal_threshold", 0.5)
+                    pred = 1 if probs[1] >= threshold else 0
                     confidence = probs[pred] * 100
                     predictions_summary.append((model_labels[key], pred, confidence, probs[1] * 100, probs[0] * 100))
             

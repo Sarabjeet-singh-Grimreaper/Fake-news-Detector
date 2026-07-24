@@ -22,18 +22,18 @@ class TestFakeNewsDetector(unittest.TestCase):
         self.assertNotIn("breaking", cleaned)
 
     def test_dense_features_extraction(self):
-        """Unit Test: Verifies all 30 dense statistical features are calculated correctly."""
+        """Unit Test: Verifies all 32 dense statistical features are calculated correctly."""
         text = "This is a standard test sentence. It contains some text. Let's see what happens!"
         feats = compute_dense_features(text, "test sentence text happens", "Test Title")
         
-        self.assertEqual(len(feats), 30)
+        self.assertEqual(len(feats), 32)
         # Assert specific feature indices ranges (e.g. all features are float/int)
         for val in feats:
             self.assertTrue(isinstance(val, (int, float, np.float64, np.int64)))
             
         # Title length features validation
-        self.assertEqual(feats[22], len("Test Title")) # Title chars count
-        self.assertEqual(feats[23], 2) # Title words count
+        self.assertEqual(feats[24], len("Test Title")) # Title chars count
+        self.assertEqual(feats[25], 2) # Title words count
 
     def test_domain_trust_engine(self):
         """Unit Test: Verifies domain trust categorization and scoring."""
@@ -68,10 +68,10 @@ class TestFakeNewsDetector(unittest.TestCase):
         with open(scaler_path, "rb") as f:
             scaler = pickle.load(f)
             
-        # Verify shape sizes match expectations (4000 selected vocabulary + 30 dense = 4030)
+        # Verify shape sizes match expectations (4000 selected vocabulary + 32 dense = 4032)
         support_len = np.sum(selector.get_support())
         self.assertEqual(support_len, 4000)
-        self.assertEqual(len(scaler.scale_), 30)
+        self.assertEqual(len(scaler.scale_), 32)
 
     def test_local_explainability_surrogate(self):
         """Model Explainability Test: Verifies that local linear contributions are calculated correctly."""

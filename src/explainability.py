@@ -7,6 +7,7 @@ DENSE_FEATURE_NAMES = [
     "Flesch Reading Ease", "Flesch-Kincaid Grade", "Gunning Fog Index", "Coleman-Liau Index", "SMOG Index",
     "Sentiment Polarity", "Subjectivity Score", "Emotion Intensity",
     "Excessive Punctuation Indicator", "Clickbait Word Ratio", "All Caps Ratio", "Sensational Phrase Ratio", "Urgency Indicator Ratio",
+    "Hedging Language Density", "Certainty Language Density",
     "Title Chars Count", "Title Words Count", "Article Chars Count",
     "Paragraph Count", "Quotation Count", "External Links Count", "Word Count", "Reading Time"
 ]
@@ -23,11 +24,28 @@ def explain_prediction(text_raw: str, clean_str: str, vectorized_input, dense_fe
     # Pack dense features
     X_dense = np.array([dense_feats_list], dtype=np.float64)
     
-    # 2. Extract coefficients (supports LogisticRegression or SGDClassifier)
-    if not hasattr(model, "coef_") or model.coef_ is None:
+    # 2. Extract coefficients (supports LogisticRegression, SGDClassifier, and CalibratedClassifierCV wrappers)
+    if hasattr(model, "coef_") and model.coef_ is not None:
+        coefficients = model.coef_[0]
+    elif hasattr(model, "calibrated_classifiers_"):
+        coefs = []
+        for clf in model.calibrated_classifiers_:
+            # Check for fitted base estimator in the calibrated wrapper
+            base_est = getattr(clf, "base_estimator", None)
+            if base_est is None:
+                # Scikit-learn renamed base_estimator to estimator in v1.2+
+                base_est = getattr(clf, "estimator", None)
+                
+            if base_est is not None and hasattr(base_est, "coef_") and base_est.coef_ is not None:
+                coefs.append(base_est.coef_[0])
+        if coefs:
+            coefficients = np.mean(coefs, axis=0)
+        else:
+            return {"error": "Model does not support coefficient extraction for explainability."}
+    else:
         return {"error": "Model does not support coefficient extraction for explainability."}
         
-    coefficients = model.coef_[0]
+    coefficients = coefficients
     
     # 3. Calculate word-level contributions
     feature_names = np.array(vectorizer.get_feature_names_out())

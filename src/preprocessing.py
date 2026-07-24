@@ -243,6 +243,15 @@ def compute_dense_features(raw_text, clean_str, title=""):
     urgency_count = sum(1 for indicator in urgency_indicators if indicator in text_lower)
     urgency_ratio = urgency_count / clean_words_count
     
+    # --- Hedging and Certainty Language ---
+    hedging_words = {"maybe", "perhaps", "possibly", "allegedly", "reportedly", "could", "might", "suggests", "seems", "apparently", "presumably", "suspected", "rumored"}
+    hedging_count = sum(clean_words.count(w) for w in hedging_words)
+    hedging_ratio = hedging_count / clean_words_count
+    
+    certainty_words = {"definitely", "absolutely", "always", "never", "proven", "fact", "undeniable", "unquestionably", "certainly", "truth", "obvious", "obviously", "clear", "clearly"}
+    certainty_count = sum(clean_words.count(w) for w in certainty_words)
+    certainty_ratio = certainty_count / clean_words_count
+
     # --- Metadata Features ---
     title_str = str(title) if title else ""
     title_length_chars = len(title_str)
@@ -262,6 +271,7 @@ def compute_dense_features(raw_text, clean_str, title=""):
         flesch_reading_ease, flesch_kincaid_grade, gunning_fog, coleman_liau, smog_index,
         polarity, subjectivity, emotion_intensity,
         excessive_punct, clickbait_ratio, all_caps_ratio, sensational_ratio, urgency_ratio,
+        hedging_ratio, certainty_ratio,
         title_length_chars, title_length_words, article_length_chars,
         paragraph_count, quotation_count, external_links, word_count, reading_time
     ]
