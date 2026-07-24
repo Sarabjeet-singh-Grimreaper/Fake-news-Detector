@@ -832,6 +832,12 @@ with col_diagnostics:
             # Scale dense features
             dense_meta = np.array([dense_feats_list], dtype=np.float64)
             if assets.get("scaler") is not None:
+                expected_feats = assets["scaler"].n_features_in_
+                actual_feats = dense_meta.shape[1]
+                if actual_feats != expected_feats:
+                    st.cache_resource.clear()
+                    st.error(f"🔄 **Feature Mismatch Detected ({actual_feats} vs {expected_feats})**: The models were recently updated with new features. Streamlit's cache has been cleared automatically. **Please refresh your browser tab** to reload the updated code modules.")
+                    st.stop()
                 dense_meta = assets["scaler"].transform(dense_meta)
                 
             # Apply feature selector to TF-IDF input
