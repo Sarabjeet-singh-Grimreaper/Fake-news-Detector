@@ -5,6 +5,8 @@ import scipy.sparse as sp
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 from src.preprocessing import full_preprocess_pipeline, compute_dense_features
 from src.domain_trust import get_domain_credibility
+from src.explainability import explain_prediction
+from src.error_handler import save_failed_prediction
 
 BENCHMARK_SAMPLES = [
     {
@@ -136,6 +138,23 @@ def run_benchmark():
         y_probs.append(prob_real)
         
         is_correct = (pred_label == sample["label"])
+        if not is_correct:
+            expl = explain_prediction(sample["text"], clean_text, tfidf_vec, dense_feats, ensemble, vectorizer, selector)
+            top_features = []
+            if "error" not in expl:
+                top_features = [item[0] for item in (expl.get("top_fake_words", []) + expl.get("top_real_words", []))[:5]]
+            failure_reason = "Out-of-domain style mimicry and professional formatting bypass classical tf-idf indicators."
+            save_failed_prediction(
+                title=sample["title"],
+                text=sample["text"],
+                url=sample["url"],
+                predicted_label=pred_label,
+                true_label=sample["label"],
+                confidence=prob_real if pred_label == 1 else (1.0 - prob_real),
+                top_features=top_features,
+                failure_reason=failure_reason
+            )
+            
         cred_info = get_domain_credibility(sample["url"])
         
         results.append({
