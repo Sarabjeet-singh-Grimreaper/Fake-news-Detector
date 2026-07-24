@@ -639,11 +639,12 @@ with col_workspace:
         
         article_text = st.text_area(
             "Paste Raw Stream",
-            key="article_text",
+            value=st.session_state.get("article_text", ""),
             height=180,
             placeholder="Paste global journalism strings or verified reporting feeds here...",
             label_visibility="collapsed"
         )
+        st.session_state["article_text"] = article_text
         
         st.markdown("<p style='color: #C0D5D6; font-size: 0.8rem; margin: 0.75rem 0 0.25rem 0; font-weight:600;'>Load Baseline Research Demos:</p>", unsafe_allow_html=True)
         btn_col1, btn_col2 = st.columns(2)
