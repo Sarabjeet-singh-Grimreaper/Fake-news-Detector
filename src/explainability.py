@@ -2,50 +2,56 @@ import numpy as np
 import scipy.sparse as sp
 
 DENSE_FEATURE_NAMES = [
-    "Lexical Diversity", "Type-Token Ratio", "Hapax Legomena Ratio", "Avg Sentence Length", "Avg Word Length",
-    "Punctuation Density", "Digit Ratio", "Uppercase Ratio", "Stopword Ratio",
-    "Flesch Reading Ease", "Flesch-Kincaid Grade", "Gunning Fog Index", "Coleman-Liau Index", "SMOG Index",
-    "Sentiment Polarity", "Subjectivity Score", "Emotion Intensity",
-    "Excessive Punctuation Indicator", "Clickbait Word Ratio", "All Caps Ratio", "Sensational Phrase Ratio", "Urgency Indicator Ratio",
-    "Title Chars Count", "Title Words Count", "Article Chars Count",
-    "Paragraph Count", "Quotation Count", "External Links Count", "Word Count", "Reading Time"
+    "Average Sentence Length", "Lexical Diversity", "Entropy", "Flesch Reading Ease", # Group B
+    "Quotes Count", "Named Entities Est", "Credibility Citations",                   # Group C
+    "Speculation Ratio",                                                            # Group D
+    "Clickbait Score",                                                              # Group E
+    "Polarity", "Subjectivity", "Emotional Intensity"                               # Group F
 ]
 
-def explain_prediction(text_raw: str, clean_str: str, vectorized_input, dense_feats_list, model, vectorizer, selector) -> dict:
+def explain_prediction(text_raw: str, clean_str: str, vectorized_tfidf, dense_feats_list, model, vectorizer) -> dict:
     """
-    Computes local feature contribution explanations (linear SHAP-like approximations)
-    for a given news article prediction.
+    Computes local feature contribution explanations (normalized decision influence shares)
+    for a given news article prediction based on linear model coefficients.
     """
-    # 1. Align/Transform input features
-    # Transform TF-IDF
-    X_tfidf_selected = selector.transform(vectorized_input)
-    
     # Pack dense features
     X_dense = np.array([dense_feats_list], dtype=np.float64)
     
     # 2. Extract coefficients (supports LogisticRegression or SGDClassifier)
-    if not hasattr(model, "coef_") or model.coef_ is None:
+    if hasattr(model, "estimator"):
+        base_model = None
+        if hasattr(model.estimator, "estimators_"):
+            for name, est in model.estimator.estimators_:
+                if hasattr(est, "coef_"):
+                    base_model = est
+                    break
+        elif hasattr(model, "calibrated_classifiers_"):
+            for cal in model.calibrated_classifiers_:
+                if hasattr(cal.base_estimator, "coef_"):
+                    base_model = cal.base_estimator
+                    break
+        
+        if base_model is not None:
+            coefficients = base_model.coef_[0]
+        else:
+            return {"error": "Model does not support coefficient extraction for explainability."}
+    elif hasattr(model, "coef_") and model.coef_ is not None:
+        coefficients = model.coef_[0]
+    else:
         return {"error": "Model does not support coefficient extraction for explainability."}
         
-    coefficients = model.coef_[0]
-    
     # 3. Calculate word-level contributions
     feature_names = np.array(vectorizer.get_feature_names_out())
-    # Selected feature indices mapping
-    selected_indices = selector.get_support(indices=True)
-    selected_feature_names = feature_names[selected_indices]
     
-    # Multiply local TF-IDF value by the coefficient
-    row = X_tfidf_selected.tocoo()
+    row = vectorized_tfidf.tocoo()
     word_contributions = []
     for col_idx, value in zip(row.col, row.data):
-        feat_name = selected_feature_names[col_idx]
-        coef = coefficients[col_idx]
-        contrib = value * coef
-        word_contributions.append((feat_name, float(contrib), float(value)))
+        if col_idx < len(feature_names):
+            feat_name = feature_names[col_idx]
+            coef = coefficients[col_idx]
+            contrib = value * coef
+            word_contributions.append((feat_name, float(contrib), float(value)))
         
-    # Sort contributions
-    # Positive pushes to Real (1), Negative pushes to Fake (0)
     word_contributions = sorted(word_contributions, key=lambda x: x[1], reverse=True)
     
     top_real_words = [item for item in word_contributions if item[1] > 0][:8]
@@ -53,11 +59,12 @@ def explain_prediction(text_raw: str, clean_str: str, vectorized_input, dense_fe
     
     # 4. Calculate dense metadata / stylometrics contributions
     dense_contributions = []
-    dense_offset = len(selected_indices)
+    dense_offset = len(feature_names)
     
     for idx, name in enumerate(DENSE_FEATURE_NAMES):
         val = dense_feats_list[idx]
-        coef = coefficients[dense_offset + idx]
+        coef_idx = dense_offset + idx
+        coef = coefficients[coef_idx] if coef_idx < len(coefficients) else 0.0
         contrib = val * coef
         dense_contributions.append({
             "feature": name,
@@ -67,24 +74,41 @@ def explain_prediction(text_raw: str, clean_str: str, vectorized_input, dense_fe
         
     dense_contributions = sorted(dense_contributions, key=lambda x: x["contribution"], reverse=True)
     
-    # Summarize contributions by categories
-    # Readability (indices 9 to 13)
-    readability_contrib = sum(dense_contributions[i]["contribution"] for i, name in enumerate(DENSE_FEATURE_NAMES) if "index" in name.lower() or "ease" in name.lower() or "grade" in name.lower() or "fog" in name.lower() or "liau" in name.lower() or "smog" in name.lower())
-    # Sentiment / Clickbait (indices 14 to 21)
-    emotion_clickbait_contrib = sum(dense_contributions[idx]["contribution"] for idx, name in enumerate(DENSE_FEATURE_NAMES) if any(kw in name.lower() for kw in ["sentiment", "polarity", "subjectivity", "clickbait", "urgency", "sensational", "emotion"]))
-    # Stylometrics (indices 0 to 8)
-    style_contrib = sum(dense_contributions[idx]["contribution"] for idx, name in enumerate(DENSE_FEATURE_NAMES) if any(kw in name.lower() for kw in ["diversity", "ratio", "length", "density"]))
-    # Metadata (indices 22 to 29)
-    metadata_contrib = sum(dense_contributions[idx]["contribution"] for idx, name in enumerate(DENSE_FEATURE_NAMES) if any(kw in name.lower() for kw in ["chars", "words", "count", "links", "time"]))
+    # Summarize raw contributions
+    style_contrib = sum(c["contribution"] for c in dense_contributions if c["feature"] in ["Average Sentence Length", "Lexical Diversity", "Entropy", "Flesch Reading Ease"])
+    credibility_contrib = sum(c["contribution"] for c in dense_contributions if c["feature"] in ["Quotes Count", "Named Entities Est", "Credibility Citations"])
+    speculation_contrib = sum(c["contribution"] for c in dense_contributions if c["feature"] == "Speculation Ratio")
+    clickbait_contrib = sum(c["contribution"] for c in dense_contributions if c["feature"] == "Clickbait Score")
+    emotion_contrib = sum(c["contribution"] for c in dense_contributions if c["feature"] in ["Polarity", "Subjectivity", "Emotional Intensity"])
+    
+    # Word-level total raw contributions
+    word_contrib_sum = sum(item[1] for item in word_contributions)
+    
+    # Absolute values for normalization
+    raw_contribs = {
+        "Writing Style (Group B)": style_contrib,
+        "Source Credibility (Group C)": credibility_contrib,
+        "Speculation (Group D)": speculation_contrib,
+        "Clickbait (Group E)": clickbait_contrib,
+        "Emotion (Group F)": emotion_contrib,
+        "Linguistic Vocabulary (Group A)": word_contrib_sum
+    }
+    
+    total_abs = sum(abs(v) for v in raw_contribs.values())
+    if total_abs == 0:
+        total_abs = 1e-5
+        
+    # Calculate share percentages summing to 100%
+    normalized_shares = {}
+    for category, val in raw_contribs.items():
+        normalized_shares[category] = {
+            "share": (abs(val) / total_abs) * 100.0,
+            "direction": "Positive (+)" if val >= 0 else "Negative (-)"
+        }
 
     return {
         "top_real_words": top_real_words,
         "top_fake_words": top_fake_words,
         "dense_contributions": dense_contributions,
-        "category_summary": {
-            "Readability": float(readability_contrib),
-            "Style & Lexicon": float(style_contrib),
-            "Emotion & Sensationalism": float(emotion_clickbait_contrib),
-            "Article Metadata": float(metadata_contrib)
-        }
+        "category_summary": normalized_shares
     }
