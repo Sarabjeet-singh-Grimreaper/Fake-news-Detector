@@ -1,7 +1,11 @@
 import os
+import sys
 import pickle
 import scipy.sparse as sp
 import numpy as np
+
+# Ensure project root is on sys.path for standalone script execution
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from src.pipeline import NewsCredibilityPipeline
 
 def verify_detector():

@@ -33,18 +33,18 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
+      - name: Stage Static Site Files
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp style.css _site/
+          cp app.js _site/
+          if [ -d "assets" ]; then cp -r assets _site/; fi
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload only the static web files
-          path: '.'
-          # Filter for static site files to avoid uploading large python datasets or virtualenvs
-          # (GitHub Pages uploads files recursively, so specifying only necessary files minimizes build payload size)
-          include: |
-            index.html
-            style.css
-            app.js
-            assets/**
+          path: '_site'
 
       - name: Deploy to GitHub Pages
         id: deployment

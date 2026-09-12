@@ -23,11 +23,10 @@ def run_strict_news_classification_test():
         vectorizer = pickle.load(f)
         
     model_paths = {
-        "Online Logic Engine (SGD)": "models/logreg_model.pkl",
+        "Logistic Regression": "models/logreg_model.pkl",
         "Random Forest Automata": "models/random_forest_model.pkl",
-        "Neural Network Array (MLP)": "models/neuralnet_model.pkl",
-        "K-Nearest Neighbors (KNN)": "models/knn_model.pkl",
-        "Support Vector Machine (SVM)": "models/svm_model.pkl"
+        "Support Vector Machine (SVM)": "models/svm_model.pkl",
+        "Voting Ensemble Consensus": "models/voting_ensemble_model.pkl"
     }
     
     for name, path in model_paths.items():

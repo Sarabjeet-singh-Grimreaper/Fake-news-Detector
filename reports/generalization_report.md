@@ -1,26 +1,42 @@
 # Real-World Out-of-Domain Generalization Report
 
-This report evaluates the credibility detector against fresh, out-of-domain articles from public news outlets, health authorities, and conspiracy blogs.
+This report benchmarks the Fake News Credibility Engine against raw out-of-domain articles from public news agencies, health authorities, and conspiracy feeds.
 
-## 1. Generalization Benchmark Score
+## 1. Executive Summary
 
-- **Total Benchmark Articles**: 7
-- **Ensemble Accuracy**: 100.00%
+- **Total Benchmark Articles**: 11
+- **Baseline ML Accuracy**: 72.73% (8/11 passed)
+- **Multi-Signal Real-Time Engine Accuracy**: 100.00% (11/11 passed)
 - **Status**: [PASS] High Robustness
 
-## 2. Evaluation Results Breakdown
+## 2. Multi-Signal Fusion Evaluation Breakdown
 
-| Source | Article Title | Domain | Domain Score | Actual | Predicted | Confidence | Result |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| BBC News (Real) | UK Inflation Rates Decrease to Target Levels | bbc.com | 98 | Real | Real | 98.4% | ✅ PASS |
-| Reuters (Real) | EU Imposes New Green Tariffs on Industrial Carbon Imports | reuters.com | 100 | Real | Real | 98.8% | ✅ PASS |
-| Associated Press (Real) | Midwest Floods Force Thousands to Evacuate | apnews.com | 99 | Real | Real | 99.0% | ✅ PASS |
-| The Guardian (Real) | Oxford Malaria Vaccine Receives International Regulatory Approval | theguardian.com | 96 | Real | Real | 88.2% | ✅ PASS |
-| Official WHO Press (Real) | WHO Launches New Global Program to Combat Emerging Pathogens | who.int | 100 | Real | Real | 70.8% | ✅ PASS |
-| Partisan Feed (Fake) | ALERT: Secret Holographic Microchips Found in Distributed Water Supplies | naturalnews.com | 15 | Fake | Fake | 98.8% | ✅ PASS |
-| Conspiracy Portal (Fake) | SHOCKING PROOF: Mars Space Rover Mission Filmed Entirely in Nevada Desert | infowars.com | 10 | Fake | Fake | 98.0% | ✅ PASS |
+| Source File | Ground Truth | Multi-Signal Verdict | Score | Status | Primary Decision Factor |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `real/AP.txt` | Real | Verified Real News | 88.0% | ✅ PASS | Verified in real-time across 3 recognized glo... |
+| `real/BBC.txt` | Real | Verified Real News | 88.0% | ✅ PASS | Verified in real-time across 7 recognized glo... |
+| `real/Government.txt` | Real | Likely Real | 60.8% | ✅ PASS | Linguistic markers, writing structure, and mo... |
+| `real/Reuters.txt` | Real | Verified Real News | 88.0% | ✅ PASS | Verified in real-time across 4 recognized glo... |
+| `real/WHO.txt` | Real | Verified Real News | 88.0% | ✅ PASS | Verified in real-time across 6 recognized glo... |
+| `fake/AI_generated.txt` | Fake | Likely Fake | 26.1% | ✅ PASS | Stylistic markers strongly resemble fabricate... |
+| `fake/Clickbait.txt` | Fake | Likely Fake | 27.9% | ✅ PASS | Stylistic markers strongly resemble fabricate... |
+| `fake/Finance.txt` | Fake | Likely Fake | 47.7% | ✅ PASS | Stylistic irregularities, sensational markers... |
+| `fake/Health.txt` | Fake | Likely Fake | 29.2% | ✅ PASS | Stylistic markers strongly resemble fabricate... |
+| `fake/Political.txt` | Fake | Likely Fake | 26.2% | ✅ PASS | Stylistic markers strongly resemble fabricate... |
+| `fake/Satire.txt` | Fake | Satire / Parody | 15.0% | ✅ PASS | Content exhibits recognized satirical phrasin... |
 
-## 3. Findings & Recommendation
+## 3. Baseline ML Standalone Breakdown
 
-- **Domain Credibility Integration**: Domain Trust scores successfully contextualize predictions, providing validation support for reputable domains.
-- **Feature Range Defense**: Standardizing dense indicators protects the model from classifying science-themed articles erroneously, enhancing generalized text pattern learning.
+| Source File | Ground Truth | Model Prediction | Confidence | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| `real/AP.txt` | Real | Real | 68.0% | ✅ PASS |
+| `real/BBC.txt` | Real | Real | 66.3% | ✅ PASS |
+| `real/Government.txt` | Real | Real | 55.9% | ✅ PASS |
+| `real/Reuters.txt` | Real | Fake | 53.8% | ❌ FAIL |
+| `real/WHO.txt` | Real | Fake | 63.7% | ❌ FAIL |
+| `fake/AI_generated.txt` | Fake | Fake | 73.2% | ✅ PASS |
+| `fake/Clickbait.txt` | Fake | Fake | 90.1% | ✅ PASS |
+| `fake/Finance.txt` | Fake | Fake | 55.3% | ✅ PASS |
+| `fake/Health.txt` | Fake | Fake | 68.0% | ✅ PASS |
+| `fake/Political.txt` | Fake | Fake | 73.0% | ✅ PASS |
+| `fake/Satire.txt` | Fake | Real | 60.9% | ❌ FAIL |

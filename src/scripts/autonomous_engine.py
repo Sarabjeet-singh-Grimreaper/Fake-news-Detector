@@ -9,7 +9,7 @@ from src.preprocessing import clean_text, tokenize_and_filter
 
 # Define paths
 VECTORIZER_PATH = "models/tfidf_vectorizer.pkl"
-MODEL_PATH = "models/logreg_model.pkl"
+MODEL_PATH = "models/sgd_online_model.pkl"
 DRIFT_REVIEW_PATH = "data/drift_review.json"
 
 # Lexicon for lightweight, dependency-free Sentiment Bias calculation
@@ -123,14 +123,16 @@ def load_or_init_model_and_vectorizer():
         model.classes_ = np.array([0, 1])
 
         
-    # Dynamically expand coefficients if shape mismatch exists (5000 TF-IDF features -> 5011 hybrid features)
-    expected_features = len(vectorizer.get_feature_names_out()) + 11
+    # Dynamically expand coefficients if shape mismatch exists (4000 TF-IDF features -> 4012 hybrid features)
+    expected_features = len(vectorizer.get_feature_names_out()) + 12
     if hasattr(model, "coef_") and model.coef_ is not None:
         current_features = model.coef_.shape[1]
-        if current_features < expected_features:
-            diff = expected_features - current_features
-            print(f"[Engine] Shape alignment: expanding model coefficient matrix from {current_features} to {expected_features} features.")
-            model.coef_ = np.hstack([model.coef_, np.zeros((model.coef_.shape[0], diff))])
+        if current_features != expected_features:
+            print(f"[Engine] Shape alignment: resetting model weights to match {expected_features} features (was {current_features}).")
+            model = SGDClassifier(loss="log_loss", penalty="l2", alpha=0.0001, random_state=42)
+            model.classes_ = np.array([0, 1])
+            model.coef_ = np.zeros((1, expected_features))
+            model.intercept_ = np.zeros(1)
     else:
         # Initialize coefficients block to zero if model is not yet fit
         model.coef_ = np.zeros((1, expected_features))

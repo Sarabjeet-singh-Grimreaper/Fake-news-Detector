@@ -1,4 +1,4 @@
-﻿# VerifiQ: AI-Powered Fake News Detection Using Text Classification
+# VerifiQ: AI-Powered Fake News Detection Using Text Classification
 
 Welcome to the documentation for the project **"AI-Powered Fake News Detection Using Text Classification"** developed for the **Summer Internship Program in AI & ML 2026**.
 
@@ -105,14 +105,62 @@ VerifIQ solves this using **Incremental Online Learning** backed by scikit-learn
 
 ## ⚙️ Setup and Installation
 
-### 🚀 Simplified Quick Start (One-Click Launch)
-We have provided a unified launcher script to handle virtual environment creation, package installation, and application launching automatically.
+### 📋 Prerequisites
+* **Python 3.9+** installed and added to system `PATH`.
+* **Git** (for cloning the repository).
 
-Simply run the batch script from your terminal:
+---
+
+### 🚀 Option 1: One-Click Quick Start (Windows)
+A unified launcher script is provided to automate virtual environment creation, dependency installation, and portal launching:
+
 ```powershell
 .\run.bat
 ```
-*(Or simply double-click `run.bat` in Windows File Explorer).*
+*(Alternatively, double-click `run.bat` directly in Windows File Explorer).*
+
+---
+
+### 🛠️ Option 2: Manual Step-by-Step Installation
+
+#### 1. Clone the Repository
+```bash
+git clone https://github.com/Sarabjeet-singh-Grimreaper/Fake-news-Detector.git
+cd Fake-news-Detector
+```
+
+#### 2. Create a Virtual Environment
+```bash
+python -m venv venv
+```
+
+#### 3. Activate the Virtual Environment
+* **Windows (PowerShell):**
+  ```powershell
+  # If script execution is disabled, allow it for the current process:
+  Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+  .\venv\Scripts\Activate.ps1
+  ```
+* **Windows (Command Prompt):**
+  ```cmd
+  venv\Scripts\activate.bat
+  ```
+* **macOS / Linux:**
+  ```bash
+  source venv/bin/activate
+  ```
+
+#### 4. Install Dependencies
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+#### 5. Launch the Streamlit Portal
+```bash
+streamlit run app.py
+```
+Open your browser and navigate to `http://localhost:8501`.
 
 ---
 

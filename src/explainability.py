@@ -9,16 +9,22 @@ DENSE_FEATURE_NAMES = [
     "Polarity", "Subjectivity", "Emotional Intensity"                               # Group F
 ]
 
-def explain_prediction(text_raw: str, clean_str: str, vectorized_tfidf, dense_feats_list, model, vectorizer) -> dict:
+def explain_prediction(text_raw: str, clean_str: str, vectorized_tfidf, dense_feats_list, model, vectorizer, dense_scaled=None) -> dict:
     """
     Computes local feature contribution explanations (normalized decision influence shares)
     for a given news article prediction based on linear model coefficients.
+    Uses scaled dense values for exact mathematical dot-product attribution.
     """
-    # Pack dense features
-    X_dense = np.array([dense_feats_list], dtype=np.float64)
-    
-    # 2. Extract coefficients (supports LogisticRegression or SGDClassifier)
-    if hasattr(model, "estimator"):
+    # 2. Extract linear coefficients (supports LogisticRegression, SGDClassifier, CalibratedClassifierCV, or VotingClassifier)
+    coefficients = None
+    if hasattr(model, "coef_") and model.coef_ is not None:
+        coefficients = model.coef_[0]
+    elif hasattr(model, "estimators_"):
+        for est in model.estimators_:
+            if hasattr(est, "coef_") and est.coef_ is not None:
+                coefficients = est.coef_[0]
+                break
+    elif hasattr(model, "estimator"):
         base_model = None
         if hasattr(model.estimator, "estimators_"):
             for name, est in model.estimator.estimators_:
@@ -27,17 +33,15 @@ def explain_prediction(text_raw: str, clean_str: str, vectorized_tfidf, dense_fe
                     break
         elif hasattr(model, "calibrated_classifiers_"):
             for cal in model.calibrated_classifiers_:
-                if hasattr(cal.base_estimator, "coef_"):
-                    base_model = cal.base_estimator
+                estimator = getattr(cal, "estimator", getattr(cal, "base_estimator", None))
+                if hasattr(estimator, "coef_"):
+                    base_model = estimator
                     break
         
-        if base_model is not None:
+        if base_model is not None and hasattr(base_model, "coef_"):
             coefficients = base_model.coef_[0]
-        else:
-            return {"error": "Model does not support coefficient extraction for explainability."}
-    elif hasattr(model, "coef_") and model.coef_ is not None:
-        coefficients = model.coef_[0]
-    else:
+
+    if coefficients is None:
         return {"error": "Model does not support coefficient extraction for explainability."}
         
     # 3. Calculate word-level contributions
@@ -62,13 +66,15 @@ def explain_prediction(text_raw: str, clean_str: str, vectorized_tfidf, dense_fe
     dense_offset = len(feature_names)
     
     for idx, name in enumerate(DENSE_FEATURE_NAMES):
-        val = dense_feats_list[idx]
+        raw_val = dense_feats_list[idx]
+        scaled_val = dense_scaled[idx] if (dense_scaled is not None and idx < len(dense_scaled)) else raw_val
         coef_idx = dense_offset + idx
         coef = coefficients[coef_idx] if coef_idx < len(coefficients) else 0.0
-        contrib = val * coef
+        contrib = scaled_val * coef
         dense_contributions.append({
             "feature": name,
-            "value": float(val),
+            "value": float(raw_val),
+            "scaled_value": float(scaled_val),
             "contribution": float(contrib)
         })
         

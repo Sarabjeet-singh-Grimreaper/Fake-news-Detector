@@ -8,3 +8,4 @@ openpyxl
 streamlit
 beautifulsoup4
 requests
+kagglehub
